@@ -1,0 +1,142 @@
+import Foundation
+import ImageIO
+import UniformTypeIdentifiers
+
+struct ProbeResult: Sendable, Equatable {
+    var duration: Double?
+    /// Display dimensions (container rotation already applied).
+    var width: Int?
+    var height: Int?
+    var fps: Double?
+    var hasVideo = false
+    var hasAudio = false
+    var videoCodec: String?
+    var pixelFormat: String?
+    var audioBitDepth: Int?
+    var isStillImage = false
+
+    var isHighBitDepth: Bool {
+        guard let pixelFormat else { return false }
+        return pixelFormat.contains("10") || pixelFormat.contains("12")
+    }
+}
+
+enum ProbeError: LocalizedError {
+    case unreadable(String)
+
+    var errorDescription: String? {
+        switch self {
+        case .unreadable(let message): message
+        }
+    }
+}
+
+enum Probe {
+    static func run(ffprobe: URL, file: URL) async throws -> ProbeResult {
+        let output = try await ProcessRunner.capture(ffprobe, [
+            "-v", "error", "-print_format", "json", "-show_format", "-show_streams", file.path,
+        ])
+        guard output.status == 0 else {
+            let reason = FFmpegRunner.summarize(stderr: output.stderrString)
+            throw ProbeError.unreadable(reason.isEmpty ? "Not a readable media file" : reason)
+        }
+        return try parse(json: output.stdout)
+    }
+
+    static func parse(json: Data) throws -> ProbeResult {
+        guard let root = try JSONSerialization.jsonObject(with: json) as? [String: Any] else {
+            throw ProbeError.unreadable("Unexpected ffprobe output")
+        }
+        let streams = root["streams"] as? [[String: Any]] ?? []
+        let format = root["format"] as? [String: Any] ?? [:]
+        var result = ProbeResult()
+
+        result.duration = double(format["duration"])
+
+        let videoStreams = streams.filter { stream in
+            let attached = (stream["disposition"] as? [String: Any])?["attached_pic"] as? Int == 1
+            return stream["codec_type"] as? String == "video" && !attached
+        }
+        if let v = videoStreams.first {
+            result.hasVideo = true
+            result.videoCodec = v["codec_name"] as? String
+            result.pixelFormat = v["pix_fmt"] as? String
+            var w = v["width"] as? Int
+            var h = v["height"] as? Int
+            if let rotation = rotation(of: v), Int(abs(rotation).rounded()) % 180 == 90 {
+                swap(&w, &h)
+            }
+            result.width = w
+            result.height = h
+            result.fps = frameRate(v["avg_frame_rate"] as? String) ?? frameRate(v["r_frame_rate"] as? String)
+            if result.duration == nil { result.duration = double(v["duration"]) }
+
+            let formatName = format["format_name"] as? String ?? ""
+            let frames = Int(v["nb_frames"] as? String ?? "")
+            result.isStillImage = formatName.hasSuffix("_pipe") || formatName == "image2" || frames == 1
+        }
+        if let a = streams.first(where: { $0["codec_type"] as? String == "audio" }) {
+            result.hasAudio = true
+            let raw = Int(a["bits_per_raw_sample"] as? String ?? "") ?? 0
+            let coded = a["bits_per_sample"] as? Int ?? 0
+            let bits = max(raw, coded)
+            result.audioBitDepth = bits > 0 ? bits : nil
+        }
+        return result
+    }
+
+    private static func double(_ value: Any?) -> Double? {
+        if let s = value as? String { return Double(s) }
+        return value as? Double
+    }
+
+    private static func rotation(of stream: [String: Any]) -> Double? {
+        if let sideData = stream["side_data_list"] as? [[String: Any]] {
+            for entry in sideData {
+                if let r = entry["rotation"] as? Double { return r }
+                if let r = entry["rotation"] as? Int { return Double(r) }
+            }
+        }
+        if let tags = stream["tags"] as? [String: Any], let r = tags["rotate"] as? String {
+            return Double(r)
+        }
+        return nil
+    }
+
+    static func frameRate(_ text: String?) -> Double? {
+        guard let text else { return nil }
+        let parts = text.split(separator: "/")
+        if parts.count == 2, let n = Double(parts[0]), let d = Double(parts[1]), d > 0, n > 0 {
+            return n / d
+        }
+        return Double(text).flatMap { $0 > 0 ? $0 : nil }
+    }
+
+    // MARK: Classification
+
+    /// Media kind from the file type, falling back to ffprobe for types macOS doesn't know (mkv, webm, opus…).
+    static func classify(url: URL, ffprobe: URL?) async -> MediaKind? {
+        if let type = UTType(filenameExtension: url.pathExtension.lowercased()) {
+            if type.conforms(to: .gif) {
+                return imageFrameCount(url) > 1 ? .video : .image
+            }
+            if type.conforms(to: .image) { return .image }
+            if type.conforms(to: .audio) { return .audio }
+            if type.conforms(to: .movie) || type.conforms(to: .video) { return .video }
+            if type.conforms(to: .text) || type.conforms(to: .pdf) || type.conforms(to: .archive)
+                || type.conforms(to: .executable) || type.conforms(to: .application) {
+                return nil
+            }
+        }
+        guard let ffprobe, let probe = try? await run(ffprobe: ffprobe, file: url) else { return nil }
+        if probe.hasVideo, !probe.isStillImage { return .video }
+        if probe.hasAudio { return .audio }
+        if probe.hasVideo { return .image }
+        return nil
+    }
+
+    static func imageFrameCount(_ url: URL) -> Int {
+        guard let source = CGImageSourceCreateWithURL(url as CFURL, nil) else { return 0 }
+        return CGImageSourceGetCount(source)
+    }
+}

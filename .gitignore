@@ -1,0 +1,21 @@
+.DS_Store
+
+# SwiftPM / Xcode
+.build/
+.swiftpm/
+*.xcodeproj/
+xcuserdata/
+DerivedData/
+
+# Build output: ffmpeg deps, the packaged app, the converted model
+build/
+
+# Static ffmpeg binaries; rebuild with scripts/build-ffmpeg.sh
+vendor/ffmpeg
+vendor/ffprobe
+
+# BiRefNet conversion
+.venv/
+BiRefNet/
+*.mlpackage
+__pycache__/
