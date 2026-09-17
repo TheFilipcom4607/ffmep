@@ -1,0 +1,46 @@
+name: A conversion ffmep can't do
+description: A file ffmep won't open, or a format or setting it can't produce.
+title: "Conversion: "
+labels: ["enhancement"]
+body:
+  - type: markdown
+    attributes:
+      value: |
+        Thanks for taking the time. Most missing conversions are a small change, since ffmpeg can usually do it already.
+  - type: input
+    id: from
+    attributes:
+      label: From
+      description: The file you have, and where it came from if you know.
+      placeholder: MKV recorded with OBS
+    validations:
+      required: true
+  - type: input
+    id: to
+    attributes:
+      label: To
+      description: What you'd like to get out of it.
+      placeholder: MP4 that plays on an iPhone, keeping the subtitles
+    validations:
+      required: true
+  - type: textarea
+    id: what-happens
+    attributes:
+      label: What happens now
+      description: The message ffmep shows, or what's missing from the result.
+    validations:
+      required: true
+  - type: textarea
+    id: ffprobe
+    attributes:
+      label: ffprobe output
+      description: |
+        Optional, but it helps a lot. Run `ffprobe -hide_banner yourfile` in Terminal and paste the result.
+        If you installed ffmep from a build, ffprobe is at `ffmep.app/Contents/MacOS/ffprobe`.
+      render: text
+  - type: input
+    id: versions
+    attributes:
+      label: ffmep and macOS version
+      description: ffmep's version is in Settings > About.
+      placeholder: ffmep 1.0.0, macOS 26.1
