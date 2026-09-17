@@ -49,6 +49,12 @@ struct KindSettingsView: View {
                 .onChange(of: settings.background) { _, style in
                     if style.removesBackground { state.offerSubjectModelIfNeeded() }
                 }
+                if settings.background.removesBackground, state.subjectModel.isInstalled {
+                    Picker("Model", selection: $settings.subjectDetector) {
+                        ForEach(SubjectDetector.allCases) { Text($0.title).tag($0) }
+                    }
+                    .help("BiRefNet has cleaner edges on hair and fur. Apple Vision is faster.")
+                }
                 if settings.background == .transparent, !settings.format.supportsAlpha {
                     Label("\(settings.format.title) can’t store transparency, so the background will be white.",
                           systemImage: "info.circle")
@@ -61,9 +67,13 @@ struct KindSettingsView: View {
                 Text("Photo")
             } footer: {
                 if settings.background.removesBackground {
-                    Text(state.subjectModel.isInstalled
-                         ? "The subject is detected with BiRefNet, on this Mac."
-                         : "The subject is detected on this Mac.")
+                    if !state.subjectModel.isInstalled {
+                        Text("The subject is detected on this Mac.")
+                    } else if settings.subjectDetector == .vision {
+                        Text("The subject is detected with Apple Vision, on this Mac. It’s faster, with softer edges than BiRefNet.")
+                    } else {
+                        Text("The subject is detected with BiRefNet, on this Mac.")
+                    }
                 }
             }
         }

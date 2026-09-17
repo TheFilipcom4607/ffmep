@@ -4,7 +4,7 @@ import CoreImage.CIFilterBuiltins
 import Foundation
 import Vision
 
-/// Removes photo backgrounds on this Mac: with BiRefNet when it's downloaded, otherwise with Vision.
+/// Removes photo backgrounds on this Mac: with BiRefNet when it's downloaded and chosen, otherwise with Vision.
 /// Runs on the full-resolution image: resizing first would throw away edge detail.
 enum BackgroundRemover {
     private static let ciContext = CIContext(options: [.useSoftwareRenderer: false])
@@ -15,13 +15,13 @@ enum BackgroundRemover {
         var note: String?
     }
 
-    static func apply(_ style: BackgroundStyle, to image: CGImage) throws -> Outcome {
+    static func apply(_ style: BackgroundStyle, detector: SubjectDetector, to image: CGImage) throws -> Outcome {
         guard style.removesBackground else { return Outcome(image: image) }
         let source = CIImage(cgImage: image)
 
         var note: String?
         var mask: CIImage?
-        if SubjectModel.isInstalled {
+        if detector == .biRefNet, SubjectModel.isInstalled {
             do {
                 mask = try modelMask(for: image, source: source)
                 if mask == nil { return Outcome(image: nil) }

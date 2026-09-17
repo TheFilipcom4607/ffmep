@@ -102,6 +102,7 @@ struct ConversionSettings: Codable, Equatable, Sendable {
     var flipVertical = false
     var frameRate: FrameRateOption = .original
     var background: BackgroundStyle = .keep
+    var subjectDetector: SubjectDetector = .biRefNet
     var livePhotoMode: LivePhotoMode = .still
 
     init(format: OutputFormat) {
@@ -169,7 +170,7 @@ struct ConversionSettings: Codable, Equatable, Sendable {
     enum CodingKeys: String, CodingKey {
         case format, quality, targetSizeEnabled, targetSizeMB, resize, customWidth, customHeight,
              percent, noUpscale, videoCodec, maxCompression, metadata, rotation,
-             flipHorizontal, flipVertical, frameRate, background, livePhotoMode
+             flipHorizontal, flipVertical, frameRate, background, subjectDetector, livePhotoMode
     }
 
     /// Before Remove Location existed, metadata was a single on/off switch.
@@ -200,6 +201,7 @@ struct ConversionSettings: Codable, Equatable, Sendable {
         flipVertical = (try? c.decode(Bool.self, forKey: .flipVertical)) ?? flipVertical
         frameRate = (try? c.decode(FrameRateOption.self, forKey: .frameRate)) ?? frameRate
         background = (try? c.decode(BackgroundStyle.self, forKey: .background)) ?? background
+        subjectDetector = (try? c.decode(SubjectDetector.self, forKey: .subjectDetector)) ?? subjectDetector
         livePhotoMode = (try? c.decode(LivePhotoMode.self, forKey: .livePhotoMode)) ?? livePhotoMode
     }
 }

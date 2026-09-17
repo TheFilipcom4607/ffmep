@@ -21,3 +21,20 @@ enum BackgroundStyle: String, Codable, CaseIterable, Identifiable, Sendable {
         self == .transparent && !format.supportsAlpha ? .white : self
     }
 }
+
+/// Which model finds the subject when a background is removed.
+enum SubjectDetector: String, Codable, CaseIterable, Identifiable, Sendable {
+    /// BiRefNet when it's downloaded, Apple Vision otherwise.
+    case biRefNet
+    /// Always Apple Vision: faster, with softer edges.
+    case vision
+
+    var id: String { rawValue }
+
+    var title: String {
+        switch self {
+        case .biRefNet: "BiRefNet"
+        case .vision: "Apple Vision"
+        }
+    }
+}

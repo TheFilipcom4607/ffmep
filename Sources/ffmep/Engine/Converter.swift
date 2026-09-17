@@ -191,7 +191,7 @@ struct Converter: Sendable {
         var backgroundNote: String?
         if resizeAfterwards {
             let image = prepared.image
-            let outcome = try await blocking { try BackgroundRemover.apply(background, to: image) }
+            let outcome = try await blocking { try BackgroundRemover.apply(background, detector: settings.subjectDetector, to: image) }
             if let lifted = outcome.image {
                 prepared.image = lifted
                 backgroundNote = outcome.note

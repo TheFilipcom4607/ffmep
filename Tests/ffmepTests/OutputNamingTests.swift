@@ -152,5 +152,6 @@ final class OutputNamingTests: XCTestCase {
         XCTAssertEqual(s.quality, 40)
         XCTAssertTrue(s.noUpscale)
         XCTAssertEqual(s.resize, .original)
+        XCTAssertEqual(s.subjectDetector, .biRefNet, "settings from before the model choice use BiRefNet when it's there")
     }
 }
