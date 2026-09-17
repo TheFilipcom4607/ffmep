@@ -18,13 +18,13 @@
 
 <picture>
   <source media="(prefers-color-scheme: dark)" srcset="docs/window-dark.png">
-  <img src="docs/window-light.png" width="820" alt="The ffmep window after converting eight cat photos to WebP with transparent backgrounds. Each row shows the old and new size, like 22.2 MB to 124 KB for a DNG, and the inspector on the right holds the format, quality, size, Live Photo and background settings.">
+  <img src="docs/window-light.png" width="820" alt="The ffmep window after converting eight cat photos to WebP with transparent backgrounds. Each row shows the old and new size, like 22.2 MB to 121 KB for a DNG, and most rows note the location, date and camera details WebP left out. The inspector on the right holds the preset, format, quality, size, Live Photo, background and model settings.">
 </picture>
 
 </div>
 
 <p align="center">
-  <sub>Eight photos in, eight transparent WebPs out, 30.7 MB lighter. JPEG, HEIC and a RAW DNG<br>
+  <sub>Eight photos in, eight transparent WebPs out, 32.3 MB lighter. JPEG, HEIC and a RAW DNG<br>
   all in one batch, cut out with BiRefNet on this Mac.</sub>
 </p>
 
