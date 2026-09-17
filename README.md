@@ -97,8 +97,10 @@ Relations - G3** from [Apple's certificate page](https://www.apple.com/certifica
   and email size limits, ProRes for editing, web images, Discord emoji and more,
   and you can save your own from the inspector.
 - **Your own file names**, like `{name} (web)` or `{date} {name}`.
-- **Shortcuts.** A Convert Files action takes files, a preset or a format, and hands
-  back the converted files for the next step. It needs a signed build, see [Install](#install).
+- **Shortcuts actions** for Convert Images, Convert Videos, Convert Audio and Remove
+  Background, each with its own format, quality, size, metadata and save folder
+  settings, plus Convert Files for your presets. They hand the converted files to the
+  next step. They need a signed build, see [Install](#install).
 - **A queue that keeps moving.** Images, audio, hardware video and software video
   each get their own lane with their own limit, so a slow AV1 encode doesn't hold
   up a folder of photos.
