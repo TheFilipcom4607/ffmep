@@ -75,7 +75,7 @@ final class OutputNamingTests: XCTestCase {
         // Someone else creates song.mp3 while we're encoding.
         _ = try touch("song.mp3")
         let partial = try touch(".song.ffmep-abcd.mp3")
-        let committed = try await reservations.commit(partial: partial, to: final, source: source)
+        let committed = try await reservations.commit(partial: partial, to: final, baseName: "song")
         XCTAssertEqual(committed.lastPathComponent, "song (1).mp3")
         XCTAssertFalse(FileManager.default.fileExists(atPath: partial.path))
         XCTAssertEqual(try String(contentsOf: dir.appendingPathComponent("song.mp3"), encoding: .utf8), "x")
@@ -108,6 +108,26 @@ final class OutputNamingTests: XCTestCase {
         XCTAssertEqual(other.lastPathComponent, "song.mp3")
         let result = await reservations.takeOriginalName(of: source, output: output)
         XCTAssertEqual(result.lastPathComponent, "song (1).mp3")
+    }
+
+    func testNameTemplate() {
+        let source = URL(fileURLWithPath: "/in/IMG_1234.HEIC")
+        let date = ISO8601DateFormatter().date(from: "2026-03-04T12:00:00Z")!
+        func name(_ template: String) -> String {
+            OutputNaming.baseName(template: template, source: source, format: .webp, date: date)
+        }
+        XCTAssertEqual(name(OutputNaming.defaultTemplate), "IMG_1234")
+        XCTAssertEqual(name("{name} ({format})"), "IMG_1234 (WebP)")
+        XCTAssertEqual(name("{date} {name}"), "2026-03-04 IMG_1234")
+        XCTAssertEqual(name("web/{name}:small"), "web-IMG_1234-small")
+        XCTAssertEqual(name("  "), "IMG_1234", "empty falls back to the original name")
+        XCTAssertEqual(name("..{name}"), "IMG_1234", "never a hidden file")
+    }
+
+    func testTemplateNameStillNeverOverwrites() async throws {
+        _ = try touch("clip small.mp4")
+        let url = await OutputReservations().reserve(baseName: "clip small", directory: dir, ext: "mp4")
+        XCTAssertEqual(url.lastPathComponent, "clip small (1).mp4")
     }
 
     func testSettingsDecodeToleratesMissingKeys() throws {

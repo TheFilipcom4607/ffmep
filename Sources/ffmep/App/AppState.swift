@@ -29,6 +29,8 @@ final class AppState {
     var batch: BatchSettings { didSet { save(batch, key: Keys.batch) } }
     var saveLocation: SaveLocation { didSet { defaults.set(saveLocation.rawValue, forKey: Keys.saveLocation) } }
     var outputFolder: URL? { didSet { defaults.set(outputFolder?.path, forKey: Keys.outputFolder) } }
+    /// Output file names, e.g. `{name} ({format})`. Replace Originals always keeps the original name.
+    var nameTemplate: String { didSet { defaults.set(nameTemplate, forKey: Keys.nameTemplate) } }
     /// Always open at launch; hiding it lasts only for the session.
     var showInspector = true
     var ffmpegSource: FFmpegSource {
@@ -66,6 +68,7 @@ final class AppState {
         static let customPath = "customFFmpegPath"
         static let limits = "concurrencyLimits"
         static let notifications = "notificationsEnabled"
+        static let nameTemplate = "nameTemplate"
     }
 
     private init() {
@@ -77,6 +80,7 @@ final class AppState {
         customFFmpegPath = d.string(forKey: Keys.customPath) ?? ""
         limits = Self.load(ConcurrencyLimits.self, key: Keys.limits, from: d) ?? .default
         notificationsEnabled = d.object(forKey: Keys.notifications) as? Bool ?? true
+        nameTemplate = d.string(forKey: Keys.nameTemplate) ?? OutputNaming.defaultTemplate
 
         NotificationCenter.default.addObserver(forName: NSApplication.didBecomeActiveNotification, object: nil, queue: .main) { _ in
             NSApp.dockTile.badgeLabel = nil
@@ -411,6 +415,7 @@ final class AppState {
         let converter = Converter(tools: tools, reservations: reservations)
         let location = saveLocation
         let folder = outputFolder
+        let template = nameTemplate
         scheduler.start(
             jobs: targets,
             limits: limits,
@@ -422,7 +427,8 @@ final class AppState {
                     settings: effectiveSettings(for: job),
                     outputDirectory: OutputNaming.directory(for: job.url, location: location, folder: folder),
                     livePhotoVideo: job.livePhotoVideo,
-                    replacesOriginal: location == .replaceOriginal
+                    replacesOriginal: location == .replaceOriginal,
+                    nameTemplate: template
                 )
             },
             lane: { [self] job in

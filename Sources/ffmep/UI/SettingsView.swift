@@ -20,6 +20,25 @@ private struct GeneralSettings: View {
     var body: some View {
         @Bindable var state = state
         Form {
+            Section {
+                TextField("File Name", text: $state.nameTemplate, prompt: Text(OutputNaming.defaultTemplate))
+                LabeledContent("Example") {
+                    Text(example)
+                        .foregroundStyle(.secondary)
+                        .lineLimit(1)
+                        .truncationMode(.middle)
+                }
+            } header: {
+                Text("Converted Files")
+            } footer: {
+                VStack(alignment: .leading, spacing: 4) {
+                    Text(OutputNaming.tokens.map { "\($0.token) \($0.meaning)" }.joined(separator: " · "))
+                    Text("If a file with that name exists, a number is added. Replace Originals keeps the original name.")
+                }
+                .font(.callout)
+                .foregroundStyle(.secondary)
+            }
+
             Section("FFmpeg") {
                 Picker("Source", selection: $state.ffmpegSource) {
                     ForEach(FFmpegSource.allCases) { Text($0.title).tag($0) }
@@ -110,6 +129,11 @@ private struct GeneralSettings: View {
             }
         }
         .formStyle(.grouped)
+    }
+
+    private var example: String {
+        let name = OutputNaming.baseName(template: state.nameTemplate, source: URL(fileURLWithPath: "IMG_1234.HEIC"), format: .webp)
+        return "IMG_1234.HEIC → \(name).\(OutputFormat.webp.fileExtension)"
     }
 
     private func chooseCustomBinary() {

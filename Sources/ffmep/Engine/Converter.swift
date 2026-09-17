@@ -9,6 +9,8 @@ struct ConversionRequest: Sendable {
     var livePhotoVideo: URL?
     /// Move the original (and its Live Photo video) to the Trash once the output is safely written.
     var replacesOriginal = false
+    /// Output file name without extension, see `OutputNaming.baseName`.
+    var nameTemplate = OutputNaming.defaultTemplate
 
     /// Live Photo motion export swaps in the paired video and video settings.
     /// The output keeps the still's name, so IMG_1234.HEIC becomes IMG_1234.mp4.
@@ -51,7 +53,8 @@ struct Converter: Sendable {
         try fm.createDirectory(at: request.outputDirectory, withIntermediateDirectories: true)
 
         // Naming always follows the file the user dropped, not the hidden Live Photo video.
-        let final = await reservations.reserve(source: request.source, directory: request.outputDirectory, ext: settings.format.fileExtension)
+        let baseName = OutputNaming.baseName(template: request.nameTemplate, source: request.source, format: settings.format)
+        let final = await reservations.reserve(baseName: baseName, directory: request.outputDirectory, ext: settings.format.fileExtension)
         let partial = OutputNaming.partialURL(for: final)
         let scratch = fm.temporaryDirectory.appendingPathComponent("ffmep-\(UUID().uuidString)")
         try fm.createDirectory(at: scratch, withIntermediateDirectories: true)
@@ -65,7 +68,7 @@ struct Converter: Sendable {
                 outcome = try await convertMedia(work, partial: partial, scratch: scratch, progress: progress)
             }
             try Task.checkCancellation()
-            var output = try await reservations.commit(partial: partial, to: final, source: request.source)
+            var output = try await reservations.commit(partial: partial, to: final, baseName: baseName)
             let bytes = (try? fm.attributesOfItem(atPath: output.path)[.size] as? Int64) ?? 0
             let removed = await removedMetadata(from: outcome.sourceMetadata, output: output, format: settings.format)
             var notes = [outcome.note ?? targetSizeNote(settings, bytes: bytes)]
