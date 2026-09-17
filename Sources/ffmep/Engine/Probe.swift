@@ -14,6 +14,10 @@ struct ProbeResult: Sendable, Equatable {
     var pixelFormat: String?
     var audioBitDepth: Int?
     var isStillImage = false
+    /// Container-level tags, keys as ffprobe prints them.
+    var formatTags: [String: String] = [:]
+    /// Metadata found in the container and its streams, cover art included.
+    var metadata: Set<MetadataCategory> = []
 
     var isHighBitDepth: Bool {
         guard let pixelFormat else { return false }
@@ -52,6 +56,14 @@ enum Probe {
         var result = ProbeResult()
 
         result.duration = double(format["duration"])
+        result.formatTags = (format["tags"] as? [String: Any] ?? [:]).compactMapValues { $0 as? String }
+        result.metadata = MetadataInspector.categories(ofTags: result.formatTags.keys)
+        for stream in streams {
+            result.metadata.formUnion(MetadataInspector.categories(ofTags: (stream["tags"] as? [String: Any] ?? [:]).keys))
+            if (stream["disposition"] as? [String: Any])?["attached_pic"] as? Int == 1 {
+                result.metadata.insert(.artwork)
+            }
+        }
 
         let videoStreams = streams.filter { stream in
             let attached = (stream["disposition"] as? [String: Any])?["attached_pic"] as? Int == 1

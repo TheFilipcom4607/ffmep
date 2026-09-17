@@ -127,7 +127,7 @@ enum ImageIOConverter {
     }
 
     /// Encodes to JPEG/PNG/HEIC in memory. `quality` is 0…1 for lossy formats.
-    static func encode(_ prepared: PreparedImage, format: OutputFormat, quality: Double?, stripMetadata: Bool) throws -> Data {
+    static func encode(_ prepared: PreparedImage, format: OutputFormat, quality: Double?, metadata: MetadataMode) throws -> Data {
         let type: UTType
         switch format {
         case .jpeg: type = .jpeg
@@ -140,8 +140,9 @@ enum ImageIOConverter {
             throw ImageIOError.encodeFailed(format.title)
         }
         var props: [CFString: Any] = [:]
-        if !stripMetadata {
-            props = metadata(from: prepared.properties, width: prepared.image.width, height: prepared.image.height)
+        if metadata != .removeAll {
+            props = Self.metadata(from: prepared.properties, width: prepared.image.width, height: prepared.image.height,
+                                  keepLocation: metadata == .keep)
         }
         if let quality, format != .png {
             props[kCGImageDestinationLossyCompressionQuality] = quality
@@ -152,11 +153,19 @@ enum ImageIOConverter {
     }
 
     /// Keeps EXIF/GPS/TIFF/IPTC; orientation is reset because pixels are already upright.
-    private static func metadata(from source: [CFString: Any], width: Int, height: Int) -> [CFString: Any] {
+    /// Without `keepLocation`, GPS and the IPTC place fields are left out.
+    static func metadata(from source: [CFString: Any], width: Int, height: Int, keepLocation: Bool) -> [CFString: Any] {
         var props: [CFString: Any] = [:]
         for key in [kCGImagePropertyExifDictionary, kCGImagePropertyGPSDictionary, kCGImagePropertyTIFFDictionary,
                     kCGImagePropertyIPTCDictionary, kCGImagePropertyExifAuxDictionary] {
             if let value = source[key] { props[key] = value }
+        }
+        if !keepLocation {
+            props[kCGImagePropertyGPSDictionary] = nil
+            if var iptc = props[kCGImagePropertyIPTCDictionary] as? [CFString: Any] {
+                MetadataInspector.iptcLocationKeys.forEach { iptc[$0] = nil }
+                props[kCGImagePropertyIPTCDictionary] = iptc
+            }
         }
         props[kCGImagePropertyOrientation] = 1
         if var tiff = props[kCGImagePropertyTIFFDictionary] as? [CFString: Any] {

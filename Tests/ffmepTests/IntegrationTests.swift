@@ -113,14 +113,14 @@ final class IntegrationTests: XCTestCase {
         XCTAssertEqual(sourceProps[kCGImagePropertyOrientation] as? Int, 6, "fixture must be rotated via EXIF")
 
         var settings = ConversionSettings(format: .jpeg)
-        settings.stripMetadata = true
+        settings.metadata = .removeAll
         let stripped = try imageProperties(try await convert("gps.heic", kind: .image, settings).output)
         XCTAssertNil(stripped[kCGImagePropertyGPSDictionary])
         XCTAssertEqual(stripped[kCGImagePropertyPixelWidth] as? Int, 3024)
         XCTAssertEqual(stripped[kCGImagePropertyPixelHeight] as? Int, 4032)
         XCTAssertEqual(stripped[kCGImagePropertyOrientation] as? Int ?? 1, 1)
 
-        settings.stripMetadata = false
+        settings.metadata = .keep
         let kept = try imageProperties(try await convert("gps.heic", kind: .image, settings).output)
         XCTAssertNotNil(kept[kCGImagePropertyGPSDictionary])
         XCTAssertEqual(kept[kCGImagePropertyOrientation] as? Int ?? 1, 1)

@@ -197,7 +197,7 @@ struct Converter: Sendable {
                 let result = try await TargetSize.searchQuality(limit: TargetSize.bytes(megabytes: settings.targetSizeMB)) { q in
                     try Task.checkCancellation()
                     let encoded = try await blocking {
-                        try ImageIOConverter.encode(prepared, format: settings.format, quality: Double(q) / 100, stripMetadata: settings.stripMetadata)
+                        try ImageIOConverter.encode(prepared, format: settings.format, quality: Double(q) / 100, metadata: settings.metadata)
                     }
                     attempts[q] = encoded
                     return Int64(encoded.count)
@@ -209,7 +209,7 @@ struct Converter: Sendable {
                 data = try await blocking {
                     try ImageIOConverter.encode(prepared, format: settings.format,
                                                 quality: QualityMap.imageIOQuality(settings.quality),
-                                                stripMetadata: settings.stripMetadata)
+                                                metadata: settings.metadata)
                 }
             }
             try data.write(to: partial)

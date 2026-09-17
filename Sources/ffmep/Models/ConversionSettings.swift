@@ -96,7 +96,7 @@ struct ConversionSettings: Codable, Equatable, Sendable {
     var noUpscale = true
     var videoCodec: VideoCodec = .hevc
     var maxCompression = false
-    var stripMetadata = false
+    var metadata: MetadataMode = .keep
     var rotation: Rotation = .none
     var flipHorizontal = false
     var flipVertical = false
@@ -150,7 +150,7 @@ struct ConversionSettings: Codable, Equatable, Sendable {
         motion.rotation = rotation
         motion.flipHorizontal = flipHorizontal
         motion.flipVertical = flipVertical
-        motion.stripMetadata = stripMetadata
+        motion.metadata = metadata
         motion.videoCodec = .h264
         return motion
     }
@@ -168,8 +168,13 @@ struct ConversionSettings: Codable, Equatable, Sendable {
     // Tolerant decoding so settings saved by older versions still load.
     enum CodingKeys: String, CodingKey {
         case format, quality, targetSizeEnabled, targetSizeMB, resize, customWidth, customHeight,
-             percent, noUpscale, videoCodec, maxCompression, stripMetadata, rotation,
+             percent, noUpscale, videoCodec, maxCompression, metadata, rotation,
              flipHorizontal, flipVertical, frameRate, background, livePhotoMode
+    }
+
+    /// Before Remove Location existed, metadata was a single on/off switch.
+    private enum LegacyKeys: String, CodingKey {
+        case stripMetadata
     }
 
     init(from decoder: Decoder) throws {
@@ -185,7 +190,11 @@ struct ConversionSettings: Codable, Equatable, Sendable {
         noUpscale = (try? c.decode(Bool.self, forKey: .noUpscale)) ?? noUpscale
         videoCodec = (try? c.decode(VideoCodec.self, forKey: .videoCodec)) ?? videoCodec
         maxCompression = (try? c.decode(Bool.self, forKey: .maxCompression)) ?? maxCompression
-        stripMetadata = (try? c.decode(Bool.self, forKey: .stripMetadata)) ?? stripMetadata
+        if let mode = try? c.decode(MetadataMode.self, forKey: .metadata) {
+            metadata = mode
+        } else if (try? decoder.container(keyedBy: LegacyKeys.self).decode(Bool.self, forKey: .stripMetadata)) == true {
+            metadata = .removeAll
+        }
         rotation = (try? c.decode(Rotation.self, forKey: .rotation)) ?? rotation
         flipHorizontal = (try? c.decode(Bool.self, forKey: .flipHorizontal)) ?? flipHorizontal
         flipVertical = (try? c.decode(Bool.self, forKey: .flipVertical)) ?? flipVertical

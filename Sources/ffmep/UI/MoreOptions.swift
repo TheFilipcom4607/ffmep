@@ -14,10 +14,13 @@ struct MoreOptions: View {
                 }
             }
 
+            // ffmpeg writes WebP and GIF without any metadata, so there's nothing to choose.
             if format != .gif, format != .webp {
-                Toggle(isOn: $settings.stripMetadata) {
-                    Text("Remove Metadata")
-                    Text("Location, camera and date information")
+                Picker(selection: $settings.metadata) {
+                    ForEach(MetadataMode.choices(for: kind)) { Text($0.title).tag($0) }
+                } label: {
+                    Text("Metadata")
+                    Text(kind == .audio ? "Title, artist and album" : "Location, date, camera and owner")
                 }
             }
 

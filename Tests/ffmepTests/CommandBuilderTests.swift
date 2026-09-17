@@ -172,7 +172,7 @@ final class CommandBuilderTests: XCTestCase {
         s.rotation = .cw90
         s.flipHorizontal = true
         s.frameRate = .fps30
-        s.stripMetadata = true
+        s.metadata = .removeAll
         let args = try plan(s, probe: video4K(fps: 59.94)).passes[0]
         XCTAssertEqual(value(after: "-vf", in: args), "fps=30,scale=1280:720,transpose=1,hflip")
         XCTAssertEqual(value(after: "-map_metadata", in: args), "-1")

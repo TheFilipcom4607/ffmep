@@ -233,7 +233,7 @@ enum CommandBuilder {
         }
 
         let audioMap = (format == .mov || format == .mkv) ? "0:a?" : "0:a:0?"
-        let container = containerArgs(settings: s)
+        let container = containerArgs(settings: s, probe: p)
         let input = baseArgs + ["-i", c.input.path]
 
         var final = input + ["-map", "0:v:0"]
@@ -298,12 +298,41 @@ enum CommandBuilder {
         return filters
     }
 
-    private static func containerArgs(settings s: ConversionSettings) -> [String] {
-        var args: [String] = []
-        if s.stripMetadata { args += ["-map_metadata", "-1", "-map_chapters", "-1"] }
+    private static func containerArgs(settings s: ConversionSettings, probe p: ProbeResult) -> [String] {
+        var args = metadataArgs(settings: s, probe: p)
         switch s.format {
-        case .mp4, .mov, .m4a, .alac: args += ["-movflags", "+faststart"]
-        default: break
+        case .mp4, .mov:
+            args += ["-movflags", keepsQuickTimeKeys(settings: s, probe: p) ? "+faststart+use_metadata_tags" : "+faststart"]
+        case .m4a, .alac:
+            args += ["-movflags", "+faststart"]
+        default:
+            break
+        }
+        return args
+    }
+
+    /// iPhone and Mac recordings keep location, capture date and camera in `com.apple.quicktime.*` keys,
+    /// which the MP4/MOV muxer only writes back with `use_metadata_tags`.
+    private static func keepsQuickTimeKeys(settings s: ConversionSettings, probe p: ProbeResult) -> Bool {
+        s.metadata != .removeAll && p.formatTags.keys.contains { $0.hasPrefix("com.apple.quicktime.") }
+    }
+
+    static func metadataArgs(settings s: ConversionSettings, probe p: ProbeResult) -> [String] {
+        if s.metadata == .removeAll { return ["-map_metadata", "-1", "-map_chapters", "-1"] }
+        var args: [String] = []
+        // ffmpeg leaves out creation_time unless it's set explicitly.
+        if let created = p.formatTags["creation_time"] {
+            args += ["-metadata", "creation_time=\(created)"]
+        }
+        if keepsQuickTimeKeys(settings: s, probe: p) {
+            // use_metadata_tags would otherwise write the source's brands as keys too.
+            args += ["-metadata", "major_brand=", "-metadata", "minor_version=", "-metadata", "compatible_brands="]
+        }
+        if s.metadata == .removeLocation {
+            // An empty value deletes the tag.
+            for key in p.formatTags.keys.sorted() where MetadataInspector.category(forTag: key) == .location {
+                args += ["-metadata", "\(key)="]
+            }
         }
         return args
     }
@@ -347,7 +376,7 @@ enum CommandBuilder {
         }
 
         let args = baseArgs + ["-i", c.input.path, "-map", "0:a:0", "-vn", "-sn", "-dn"]
-            + codec + containerArgs(settings: s)
+            + codec + containerArgs(settings: s, probe: c.probe)
             + ["-f", muxer(for: s.format), c.output.path]
         return EncodePlan(passes: [args], passWeights: [1], usesHardware: false)
     }
@@ -395,7 +424,7 @@ enum CommandBuilder {
         var args = baseArgs + ["-i", c.input.path]
         if !filters.isEmpty { args += ["-vf", filters.joined(separator: ",")] }
         args += codec + ["-frames:v", "1"]
-        if s.stripMetadata { args += ["-map_metadata", "-1"] }
+        if s.metadata == .removeAll { args += ["-map_metadata", "-1"] }
         if muxer(for: s.format) == "image2" { args += ["-update", "1"] }
         args += ["-f", muxer(for: s.format), c.output.path]
         return EncodePlan(passes: [args], passWeights: [1], usesHardware: false)
