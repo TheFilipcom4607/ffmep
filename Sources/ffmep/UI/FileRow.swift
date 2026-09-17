@@ -94,7 +94,9 @@ private struct DetailText: View {
     var body: some View {
         switch job.status {
         case .done(let size):
-            Text("\(bytes(job.fileSize)) → \(bytes(size))\(savings(size))\(note)")
+            let text = "\(bytes(job.fileSize)) → \(bytes(size))\(savings(size))\(note)\(removed)"
+            Text(text)
+                .help(text)
         case .failed(let reason):
             Text(reason)
                 .help(reason)
@@ -113,6 +115,10 @@ private struct DetailText: View {
 
     private var note: String {
         job.note.map { " · \($0)" } ?? ""
+    }
+
+    private var removed: String {
+        MetadataCategory.removedSummary(job.removedMetadata).map { " · \($0)" } ?? ""
     }
 
     private func savings(_ size: Int64) -> String {

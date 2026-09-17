@@ -26,6 +26,15 @@ struct ConversionResult: Sendable {
     var output: URL
     var bytes: Int64
     var note: String?
+    /// Metadata the original had and the output doesn't, whether removed on request or because the format can't hold it.
+    var removedMetadata: [MetadataCategory] = []
+}
+
+/// What an encode step reports back besides the file itself.
+private struct EncodeOutcome {
+    var note: String?
+    /// Nil when the original's metadata couldn't be read, so nothing is reported.
+    var sourceMetadata: Set<MetadataCategory>?
 }
 
 /// Runs one file end to end: probe → encode into a hidden partial file → rename into place.
@@ -49,16 +58,17 @@ struct Converter: Sendable {
         defer { try? fm.removeItem(at: scratch) }
 
         do {
-            let note: String?
+            let outcome: EncodeOutcome
             if work.kind == .image {
-                note = try await convertImage(work, partial: partial, scratch: scratch, progress: progress)
+                outcome = try await convertImage(work, partial: partial, scratch: scratch, progress: progress)
             } else {
-                note = try await convertMedia(work, partial: partial, scratch: scratch, progress: progress)
+                outcome = try await convertMedia(work, partial: partial, scratch: scratch, progress: progress)
             }
             try Task.checkCancellation()
             var output = try await reservations.commit(partial: partial, to: final, source: request.source)
             let bytes = (try? fm.attributesOfItem(atPath: output.path)[.size] as? Int64) ?? 0
-            var notes = [note ?? targetSizeNote(settings, bytes: bytes)]
+            let removed = await removedMetadata(from: outcome.sourceMetadata, output: output, format: settings.format)
+            var notes = [outcome.note ?? targetSizeNote(settings, bytes: bytes)]
             if request.replacesOriginal {
                 let replaced = await replaceOriginals(of: request, with: output, bytes: bytes)
                 output = replaced.output
@@ -66,7 +76,7 @@ struct Converter: Sendable {
             }
             progress(1)
             let joined = notes.compactMap { $0 }.joined(separator: " · ")
-            return ConversionResult(output: output, bytes: bytes, note: joined.isEmpty ? nil : joined)
+            return ConversionResult(output: output, bytes: bytes, note: joined.isEmpty ? nil : joined, removedMetadata: removed)
         } catch {
             try? fm.removeItem(at: partial)
             await reservations.release(final)
@@ -90,6 +100,18 @@ struct Converter: Sendable {
         return (await reservations.takeOriginalName(of: request.source, output: output), nil)
     }
 
+    private func removedMetadata(from source: Set<MetadataCategory>?, output: URL, format: OutputFormat) async -> [MetadataCategory] {
+        guard let source, !source.isEmpty else { return [] }
+        let remaining: Set<MetadataCategory>?
+        if format.isStillImage || format == .gif {
+            remaining = MetadataInspector.categories(ofImageAt: output)
+        } else {
+            remaining = try? await Probe.run(ffprobe: tools.ffprobe, file: output).metadata
+        }
+        guard let remaining else { return [] }
+        return MetadataCategory.allCases.filter { source.contains($0) && !remaining.contains($0) }
+    }
+
     private func targetSizeNote(_ settings: ConversionSettings, bytes: Int64) -> String? {
         guard settings.usesTargetSize else { return nil }
         let limit = TargetSize.bytes(megabytes: settings.targetSizeMB)
@@ -99,7 +121,7 @@ struct Converter: Sendable {
 
     // MARK: Video & audio
 
-    private func convertMedia(_ request: ConversionRequest, partial: URL, scratch: URL, progress: @escaping @Sendable (Double) -> Void) async throws -> String? {
+    private func convertMedia(_ request: ConversionRequest, partial: URL, scratch: URL, progress: @escaping @Sendable (Double) -> Void) async throws -> EncodeOutcome {
         let probe = try await Probe.run(ffprobe: tools.ffprobe, file: request.source)
         try Task.checkCancellation()
         var input = CommandInput(
@@ -113,14 +135,14 @@ struct Converter: Sendable {
         let plan = try CommandBuilder.plan(input)
         do {
             try await run(plan, duration: probe.duration, progress: progress)
-            return nil
+            return EncodeOutcome(sourceMetadata: probe.metadata)
         } catch let error where plan.usesHardware && !(error is CancellationError) && !Task.isCancelled {
             // VideoToolbox can refuse some inputs (odd sizes, unsupported profiles, busy encoder): retry on the CPU.
             try? FileManager.default.removeItem(at: partial)
             input.forceSoftware = true
             let fallback = try CommandBuilder.plan(input)
             try await run(fallback, duration: probe.duration, progress: progress)
-            return "Hardware encoder failed, used software"
+            return EncodeOutcome(note: "Hardware encoder failed, used software", sourceMetadata: probe.metadata)
         }
     }
 
@@ -137,9 +159,10 @@ struct Converter: Sendable {
 
     // MARK: Images
 
-    private func convertImage(_ request: ConversionRequest, partial: URL, scratch: URL, progress: @escaping @Sendable (Double) -> Void) async throws -> String? {
+    private func convertImage(_ request: ConversionRequest, partial: URL, scratch: URL, progress: @escaping @Sendable (Double) -> Void) async throws -> EncodeOutcome {
         let settings = request.settings
         var source = request.source
+        var readsOriginal = true
 
         // Formats macOS can't decode go through ffmpeg once, then share the ImageIO path.
         if !ImageIOConverter.canRead(source) {
@@ -150,6 +173,7 @@ struct Converter: Sendable {
                 duration: nil
             ) { _ in }
             source = decoded
+            readsOriginal = false
         }
 
         // Background removal needs full-resolution pixels, so resizing waits until afterwards.
@@ -180,9 +204,11 @@ struct Converter: Sendable {
         }
         progress(0.4)
 
-        func merged(_ note: String?) -> String? {
+        // The ffmpeg-decoded stand-in has no metadata of its own, so there's nothing to compare against.
+        let sourceMetadata = readsOriginal ? MetadataInspector.categories(ofImage: prepared.properties) : nil
+        func merged(_ note: String?) -> EncodeOutcome {
             let parts = [backgroundNote, note].compactMap { $0 }
-            return parts.isEmpty ? nil : parts.joined(separator: " · ")
+            return EncodeOutcome(note: parts.isEmpty ? nil : parts.joined(separator: " · "), sourceMetadata: sourceMetadata)
         }
 
         switch settings.format {

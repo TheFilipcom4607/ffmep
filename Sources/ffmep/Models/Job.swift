@@ -40,6 +40,8 @@ final class Job: Identifiable {
     var livePhotoVideo: URL?
     /// Non-fatal information, e.g. "Target size not reachable".
     var note: String?
+    /// What the converted file no longer carries, e.g. location and camera.
+    var removedMetadata: [MetadataCategory] = []
 
     init(url: URL, kind: MediaKind, fileSize: Int64) {
         self.url = url

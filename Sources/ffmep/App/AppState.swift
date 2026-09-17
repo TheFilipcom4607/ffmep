@@ -297,7 +297,7 @@ final class AppState {
     func retry(ids: Set<UUID>) {
         // A replaced original is in the Trash, so there's nothing left to convert again.
         let targets = jobs.filter { ids.contains($0.id) && !$0.status.isRunning && FileManager.default.fileExists(atPath: $0.url.path) }
-        targets.forEach { $0.status = .waiting; $0.note = nil }
+        targets.forEach { $0.status = .waiting; $0.note = nil; $0.removedMetadata = [] }
         if !isRunning { start(targets) }
     }
 
