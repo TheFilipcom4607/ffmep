@@ -43,6 +43,40 @@ sed -e "s/__VERSION__/$VERSION/" -e "s/__BUILD__/$BUILD_NUMBER/" "$RES/Info.plis
 plutil -lint -s "$APP/Contents/Info.plist"
 printf 'APPL????' >"$APP/Contents/PkgInfo"
 cp "$RES/AppIcon.icns" "$APP/Contents/Resources/AppIcon.icns"
+
+# Shortcuts only sees App Intents listed in Contents/Resources/Metadata.appintents. Xcode generates it from the
+# constant values the compiler writes out. SwiftPM's build system writes those too but stops there, so finish the job.
+echo "→ extracting App Intents metadata"
+INTENTS_DIR="$ROOT/.build/appintents-$CONFIG"
+rm -rf "$INTENTS_DIR"
+mkdir -p "$INTENTS_DIR"
+CONFIG_DIR="$(tr '[:lower:]' '[:upper:]' <<<"${CONFIG:0:1}")${CONFIG:1}"
+FILE_MAP="$ROOT/.build/out/Intermediates.noindex/ffmep.build/$CONFIG_DIR/ffmep-p.build/Objects-normal/arm64/ffmep-OutputFileMap.json"
+if [[ -f "$FILE_MAP" ]]; then
+  plutil -convert json -o - "$FILE_MAP" | python3 -c 'import json, sys; print("\n".join(e["const-values"] for e in json.load(sys.stdin).values() if "const-values" in e))' >"$INTENTS_DIR/constvalues.txt"
+fi
+if [[ -s "$INTENTS_DIR/constvalues.txt" ]]; then
+  find "$ROOT/Sources/ffmep" -name '*.swift' >"$INTENTS_DIR/sources.txt"
+  xcrun appintentsmetadataprocessor \
+    --toolchain-dir "$(dirname "$(dirname "$(dirname "$(xcrun --find swift)")")")/usr" \
+    --module-name ffmep \
+    --sdk-root "$(xcrun --sdk macosx --show-sdk-path)" \
+    --xcode-version "$(xcodebuild -version | awk '/Build version/ { print $3 }')" \
+    --platform-family macOS \
+    --deployment-target 14.0 \
+    --target-triple arm64-apple-macos14.0 \
+    --binary-file "$APP/Contents/MacOS/ffmep" \
+    --source-file-list "$INTENTS_DIR/sources.txt" \
+    --swift-const-vals-list "$INTENTS_DIR/constvalues.txt" \
+    --output "$APP/Contents/Resources" \
+    --force >"$INTENTS_DIR/processor.log" 2>&1 \
+    || { cat "$INTENTS_DIR/processor.log"; exit 1; }
+  [[ -f "$APP/Contents/Resources/Metadata.appintents/extract.actionsdata" ]] \
+    || { cat "$INTENTS_DIR/processor.log"; echo "App Intents metadata is missing"; exit 1; }
+else
+  echo "⚠︎ This SwiftPM didn't write compiler constant values, so Shortcuts won't list ffmep's actions."
+fi
+
 cp vendor/licenses/COPYING.GPLv3 "$APP/Contents/Resources/LICENSE-GPL.txt"
 cp vendor/licenses/* "$APP/Contents/Resources/licenses/"
 [[ -f vendor/BUILDINFO.txt ]] && cp vendor/BUILDINFO.txt "$APP/Contents/Resources/BUILDINFO.txt"

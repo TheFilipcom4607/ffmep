@@ -104,6 +104,12 @@ final class AppState {
 
     // MARK: ffmpeg
 
+    /// Waits for the first lookup at launch, for callers that need ffmpeg right away (Shortcuts).
+    func readyTools() async -> FFmpegTools? {
+        if tools == nil { await toolsTask?.value }
+        return tools
+    }
+
     func reloadTools() async {
         isLoadingTools = true
         let result = await FFmpegLocator.load(source: ffmpegSource, customPath: customFFmpegPath)
