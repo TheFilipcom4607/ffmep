@@ -49,17 +49,23 @@ struct MainView: View {
 
             Menu {
                 Button("Select All") { state.selectAll() }
+                    .disabled(state.jobs.isEmpty)
                 Button("Show in Finder") { state.reveal(state.selectedJobs) }
                     .disabled(state.selection.isEmpty)
                 Divider()
                 Button("Remove Converted Files") { state.clearCompleted() }
                     .disabled(!state.jobs.contains { $0.status.isDone })
                 Button("Remove All Files", role: .destructive) { state.clearAll() }
+                    .disabled(state.jobs.isEmpty)
+                Divider()
+                // Stays enabled with an empty list, so Settings is always one click away.
+                SettingsLink {
+                    Text("Settings…")
+                }
             } label: {
                 Label("More", systemImage: "ellipsis")
             }
             .menuIndicator(.hidden)
-            .disabled(state.jobs.isEmpty)
             .help("More")
         }
 
