@@ -53,7 +53,7 @@ The first script builds a static arm64 ffmpeg and ffprobe into `vendor/`. It tak
 a while the first time, and re-runs skip whatever already finished. It needs the
 Xcode command line tools and `brew install cmake meson ninja pkgconf`.
 
-The second builds the app, bundles that ffmpeg, signs it ad-hoc and writes
+The second builds the app, bundles that ffmpeg, signs it and writes
 `build/ffmep.app` and `build/ffmep.zip`. Use `CONFIG=debug` for a debug build in
 `build/debug/`.
 
@@ -61,8 +61,20 @@ Needs an Apple silicon Mac running macOS 14 or later. Build with the macOS 26 SD
 or newer to get Liquid Glass.
 
 > [!TIP]
-> The build is signed ad-hoc, so Gatekeeper will refuse the first launch. Right-click
-> `ffmep.app` and choose **Open** once, and it will start normally after that.
+> Without a developer certificate the build is signed ad-hoc, so Gatekeeper will refuse
+> the first launch. Right-click `ffmep.app` and choose **Open** once, and it will start
+> normally after that.
+
+To use the Shortcuts action, the app has to be signed with an Apple developer
+certificate, because macOS won't run App Intents from an ad-hoc signed app. A free
+Apple ID gives you one: in Xcode, open **Settings → Accounts**, add your Apple ID, then
+**Manage Certificates → + → Apple Development**. `make-app.sh` finds that certificate by
+itself, or you can name one with `SIGN_IDENTITY`.
+
+If `security find-identity -v -p codesigning` still says 0 valid identities, your keychain
+is missing the intermediate certificate that signed yours. Install **Worldwide Developer
+Relations - G3** from [Apple's certificate page](https://www.apple.com/certificateauthority/)
+(G3, not G6).
 
 ---
 
@@ -86,7 +98,7 @@ or newer to get Liquid Glass.
   and you can save your own from the inspector.
 - **Your own file names**, like `{name} (web)` or `{date} {name}`.
 - **Shortcuts.** A Convert Files action takes files, a preset or a format, and hands
-  back the converted files for the next step.
+  back the converted files for the next step. It needs a signed build, see [Install](#install).
 - **A queue that keeps moving.** Images, audio, hardware video and software video
   each get their own lane with their own limit, so a slow AV1 encode doesn't hold
   up a folder of photos.
