@@ -1,6 +1,6 @@
 #!/usr/bin/env bash
 # Packages build/ffmep.app (with the bundled static ffmpeg) and build/ffmep.zip for sharing.
-# Usage: VERSION=1.0.0 scripts/make-app.sh
+# Usage: VERSION=1.0.0 [SIGN_IDENTITY="Apple Development: …"] scripts/make-app.sh
 set -euo pipefail
 
 ROOT="$(cd "$(dirname "$0")/.." && pwd)"
@@ -81,9 +81,20 @@ cp vendor/licenses/COPYING.GPLv3 "$APP/Contents/Resources/LICENSE-GPL.txt"
 cp vendor/licenses/* "$APP/Contents/Resources/licenses/"
 [[ -f vendor/BUILDINFO.txt ]] && cp vendor/BUILDINFO.txt "$APP/Contents/Resources/BUILDINFO.txt"
 
-echo "→ ad-hoc signing (hardened runtime)"
-codesign --force --options runtime --timestamp=none -s - "$APP/Contents/MacOS/ffmpeg" "$APP/Contents/MacOS/ffprobe"
-codesign --force --options runtime --timestamp=none -s - "$APP"
+# macOS only runs a Shortcuts action for an app signed with a team ID; linkd rejects ad-hoc builds.
+# Uses SIGN_IDENTITY if set, otherwise the first Apple Development certificate, otherwise ad-hoc.
+if [[ -z "${SIGN_IDENTITY:-}" ]]; then
+  SIGN_IDENTITY="$(security find-identity -v -p codesigning | awk -F'"' '/Apple Development|Developer ID Application/ { print $2; exit }')"
+fi
+SIGN_IDENTITY="${SIGN_IDENTITY:--}"
+if [[ "$SIGN_IDENTITY" == "-" ]]; then
+  echo "→ ad-hoc signing (hardened runtime)"
+  echo "⚠︎ No developer certificate, so Shortcuts will list ffmep's action but can't run it."
+else
+  echo "→ signing as $SIGN_IDENTITY (hardened runtime)"
+fi
+codesign --force --options runtime --timestamp=none -s "$SIGN_IDENTITY" "$APP/Contents/MacOS/ffmpeg" "$APP/Contents/MacOS/ffprobe"
+codesign --force --options runtime --timestamp=none -s "$SIGN_IDENTITY" "$APP"
 codesign --verify --strict --verbose=1 "$APP"
 
 echo "✓ $(du -sh "$APP" | cut -f1)  $APP"
