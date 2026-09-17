@@ -6,6 +6,8 @@ struct SettingsView: View {
         TabView {
             GeneralSettings()
                 .tabItem { Label("General", systemImage: "gearshape") }
+            PresetSettings()
+                .tabItem { Label("Presets", systemImage: "slider.horizontal.3") }
             AboutView()
                 .tabItem { Label("About", systemImage: "info.circle") }
         }
@@ -145,6 +147,84 @@ private struct GeneralSettings: View {
         if panel.runModal() == .OK, let url = panel.url {
             state.customFFmpegPath = url.path
             Task { await state.reloadTools() }
+        }
+    }
+}
+
+private struct PresetSettings: View {
+    @Environment(AppState.self) private var state
+
+    var body: some View {
+        Form {
+            ForEach(MediaKind.allCases) { kind in
+                let presets = state.presets(for: kind)
+                Section(kind.title) {
+                    if presets.isEmpty {
+                        Text("No \(kind.title.lowercased()) presets")
+                            .foregroundStyle(.secondary)
+                    }
+                    ForEach(presets) { preset in
+                        HStack {
+                            TextField("Name", text: nameBinding(preset.id))
+                                .labelsHidden()
+                            Text(summary(preset.settings))
+                                .foregroundStyle(.secondary)
+                                .lineLimit(1)
+                            Button {
+                                state.deletePreset(id: preset.id)
+                            } label: {
+                                Label("Delete", systemImage: "minus.circle")
+                                    .labelStyle(.iconOnly)
+                            }
+                            .buttonStyle(.borderless)
+                            .help("Delete “\(preset.name)”")
+                        }
+                    }
+                }
+            }
+            Section {
+            } footer: {
+                HStack(alignment: .firstTextBaseline) {
+                    Text("Create presets with the Preset menu in the inspector. They also appear in the Shortcuts app.")
+                    Spacer()
+                    Button("Add Examples") { addExamples() }
+                        .disabled(Preset.examples.allSatisfy { example in state.presets.contains { $0.name == example.name && $0.kind == example.kind } })
+                }
+                .foregroundStyle(.secondary)
+            }
+        }
+        .formStyle(.grouped)
+    }
+
+    /// Looked up by id, so deleting a row never leaves a binding pointing at the wrong preset.
+    private func nameBinding(_ id: UUID) -> Binding<String> {
+        Binding(
+            get: { state.presets.first { $0.id == id }?.name ?? "" },
+            set: { name in
+                if let index = state.presets.firstIndex(where: { $0.id == id }) { state.presets[index].name = name }
+            }
+        )
+    }
+
+    private func summary(_ settings: ConversionSettings) -> String {
+        var parts = [settings.format.title]
+        if settings.usesTargetSize {
+            parts.append("\(settings.targetSizeMB.formatted()) MB")
+        } else if let preset = settings.preset, settings.showsQuality {
+            parts.append(preset.title)
+        }
+        switch settings.resize {
+        case .original: break
+        case .custom: parts.append("\(settings.customWidth)×\(settings.customHeight)")
+        case .percent: parts.append("\(settings.percent)%")
+        default: parts.append(settings.resize.title)
+        }
+        return parts.joined(separator: ", ")
+    }
+
+    private func addExamples() {
+        for example in Preset.examples where !state.presets.contains(where: { $0.name == example.name && $0.kind == example.kind }) {
+            state.presets.append(example)
         }
     }
 }

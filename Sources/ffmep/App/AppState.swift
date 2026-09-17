@@ -31,6 +31,7 @@ final class AppState {
     var outputFolder: URL? { didSet { defaults.set(outputFolder?.path, forKey: Keys.outputFolder) } }
     /// Output file names, e.g. `{name} ({format})`. Replace Originals always keeps the original name.
     var nameTemplate: String { didSet { defaults.set(nameTemplate, forKey: Keys.nameTemplate) } }
+    var presets: [Preset] { didSet { save(presets, key: Keys.presets) } }
     /// Always open at launch; hiding it lasts only for the session.
     var showInspector = true
     var ffmpegSource: FFmpegSource {
@@ -69,6 +70,8 @@ final class AppState {
         static let limits = "concurrencyLimits"
         static let notifications = "notificationsEnabled"
         static let nameTemplate = "nameTemplate"
+        static let presets = "presets"
+        static let offeredExamples = "offeredExamplePresets"
     }
 
     private init() {
@@ -81,6 +84,8 @@ final class AppState {
         limits = Self.load(ConcurrencyLimits.self, key: Keys.limits, from: d) ?? .default
         notificationsEnabled = d.object(forKey: Keys.notifications) as? Bool ?? true
         nameTemplate = d.string(forKey: Keys.nameTemplate) ?? OutputNaming.defaultTemplate
+        presets = Self.load([Preset].self, key: Keys.presets, from: d) ?? []
+        addNewExamplePresets()
 
         NotificationCenter.default.addObserver(forName: NSApplication.didBecomeActiveNotification, object: nil, queue: .main) { _ in
             NSApp.dockTile.badgeLabel = nil
@@ -369,6 +374,46 @@ final class AppState {
 
     func resetSelectedOverrides() {
         selectedJobs.forEach { $0.override = nil }
+    }
+
+    // MARK: Presets
+
+    func presets(for kind: MediaKind) -> [Preset] {
+        presets.filter { $0.kind == kind }
+    }
+
+    /// Saving under a name that's already taken for this media type updates that preset.
+    func savePreset(named name: String, kind: MediaKind, settings: ConversionSettings) {
+        let name = name.trimmingCharacters(in: .whitespacesAndNewlines)
+        guard !name.isEmpty else { return }
+        if let index = presets.firstIndex(where: { $0.kind == kind && $0.name.localizedCaseInsensitiveCompare(name) == .orderedSame }) {
+            presets[index].name = name
+            presets[index].settings = settings
+        } else {
+            presets.append(Preset(name: name, kind: kind, settings: settings))
+        }
+    }
+
+    func deletePreset(id: UUID) {
+        presets.removeAll { $0.id == id }
+    }
+
+    /// Adds built-in presets that are new since the last launch. Each one is offered once,
+    /// so deleting it sticks, and presets added in later versions still show up.
+    private func addNewExamplePresets() {
+        let key = { (preset: Preset) in "\(preset.kind.rawValue)/\(preset.name)" }
+        let existing = Set(presets.map(key))
+        // Before this was tracked, the examples in the saved list were the ones that had been offered.
+        var offered = Set(defaults.stringArray(forKey: Keys.offeredExamples) ?? Array(existing))
+        let fresh = Preset.examples.filter { !offered.contains(key($0)) && !existing.contains(key($0)) }
+        // New presets go after the existing ones of the same media type.
+        for preset in fresh {
+            let index = presets.lastIndex { $0.kind == preset.kind }.map { $0 + 1 } ?? presets.endIndex
+            presets.insert(preset, at: index)
+        }
+        if !fresh.isEmpty { save(presets, key: Keys.presets) }
+        offered.formUnion(Preset.examples.map(key))
+        defaults.set(offered.sorted(), forKey: Keys.offeredExamples)
     }
 
     // MARK: Running

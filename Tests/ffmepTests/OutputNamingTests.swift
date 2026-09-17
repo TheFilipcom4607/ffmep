@@ -130,6 +130,21 @@ final class OutputNamingTests: XCTestCase {
         XCTAssertEqual(url.lastPathComponent, "clip small (1).mp4")
     }
 
+    func testExamplePresetsAreUsable() throws {
+        let presets = Preset.examples
+        XCTAssertEqual(Set(presets.map { "\($0.kind)/\($0.name)" }).count, presets.count, "names are unique per type")
+        for preset in presets {
+            let s = preset.settings
+            XCTAssertTrue(OutputFormat.choices(for: preset.kind).contains(s.format), preset.name)
+            XCTAssertTrue(ResizeOption.choices(for: preset.kind).contains(s.resize), preset.name)
+            XCTAssertTrue(MetadataMode.choices(for: preset.kind).contains(s.metadata), preset.name)
+            XCTAssertTrue(s.format.codecChoices.isEmpty || s.format.codecChoices.contains(s.videoCodec), preset.name)
+            if s.targetSizeEnabled { XCTAssertTrue(s.usesTargetSize, preset.name) }
+            let roundTrip = try JSONDecoder().decode(Preset.self, from: JSONEncoder().encode(preset))
+            XCTAssertEqual(roundTrip, preset)
+        }
+    }
+
     func testSettingsDecodeToleratesMissingKeys() throws {
         let json = #"{"format":"webp","quality":40}"#
         let s = try JSONDecoder().decode(ConversionSettings.self, from: Data(json.utf8))

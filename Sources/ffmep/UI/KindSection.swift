@@ -8,6 +8,7 @@ struct KindSettingsView: View {
 
     var body: some View {
         Section("Output") {
+            PresetPicker(kind: kind, settings: $settings)
             Picker("Format", selection: $settings.format) {
                 let choices = OutputFormat.choices(for: kind)
                 if kind == .video {
