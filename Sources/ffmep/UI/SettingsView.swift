@@ -123,6 +123,13 @@ private struct GeneralSettings: View {
                 .foregroundStyle(.secondary)
             }
 
+            Section("File List") {
+                Toggle(isOn: $state.removeConvertedFiles) {
+                    Text("Remove Converted Files Automatically")
+                    Text("Files that convert successfully leave the list when converting finishes. Files that fail stay so you can try again.")
+                }
+            }
+
             Section("Notifications") {
                 Toggle(isOn: $state.notificationsEnabled) {
                     Text("Notify When Finished")

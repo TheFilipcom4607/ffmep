@@ -43,6 +43,8 @@ final class AppState {
     var customFFmpegPath: String { didSet { defaults.set(customFFmpegPath, forKey: Keys.customPath) } }
     var limits: ConcurrencyLimits { didSet { save(limits, key: Keys.limits) } }
     var notificationsEnabled: Bool { didSet { defaults.set(notificationsEnabled, forKey: Keys.notifications) } }
+    /// Takes successfully converted files off the list when a batch finishes.
+    var removeConvertedFiles: Bool { didSet { defaults.set(removeConvertedFiles, forKey: Keys.removeConverted) } }
 
     // Background model
     let subjectModel = SubjectModelStore()
@@ -69,6 +71,7 @@ final class AppState {
         static let customPath = "customFFmpegPath"
         static let limits = "concurrencyLimits"
         static let notifications = "notificationsEnabled"
+        static let removeConverted = "removeConvertedFiles"
         static let nameTemplate = "nameTemplate"
         static let presets = "presets"
         static let offeredExamples = "offeredExamplePresets"
@@ -83,6 +86,7 @@ final class AppState {
         customFFmpegPath = d.string(forKey: Keys.customPath) ?? ""
         limits = Self.load(ConcurrencyLimits.self, key: Keys.limits, from: d) ?? .default
         notificationsEnabled = d.object(forKey: Keys.notifications) as? Bool ?? true
+        removeConvertedFiles = d.object(forKey: Keys.removeConverted) as? Bool ?? true
         nameTemplate = d.string(forKey: Keys.nameTemplate) ?? OutputNaming.defaultTemplate
         presets = Self.load([Preset].self, key: Keys.presets, from: d) ?? []
         addNewExamplePresets()
@@ -522,6 +526,7 @@ final class AppState {
         if !failed.isEmpty { summary += " · \(failed.count) failed" }
         statusMessage = runJobs.isEmpty ? nil : summary
         statusIsSuccess = failed.isEmpty && !done.isEmpty
+        if removeConvertedFiles { clearCompleted() }
 
         guard !done.isEmpty || !failed.isEmpty else { return }
         if !NSApp.isActive {
