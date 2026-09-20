@@ -40,6 +40,8 @@ final class Job: Identifiable {
     var livePhotoVideo: URL?
     /// Non-fatal information, e.g. "Target size not reachable".
     var note: String?
+    /// What ffmpeg printed when this job failed, kept for the row's tooltip and bug reports.
+    var failureDetail: String?
     /// What the converted file no longer carries, e.g. location and camera.
     var removedMetadata: [MetadataCategory] = []
 

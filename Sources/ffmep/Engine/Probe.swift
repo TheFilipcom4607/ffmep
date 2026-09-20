@@ -37,12 +37,18 @@ struct ProbeResult: Sendable, Equatable {
     }
 }
 
-enum ProbeError: LocalizedError {
-    case unreadable(String)
+enum ProbeError: LocalizedError, DetailedError {
+    case unreadable(String, detail: String? = nil)
 
     var errorDescription: String? {
         switch self {
-        case .unreadable(let message): message
+        case .unreadable(let message, _): message
+        }
+    }
+
+    var failureDetail: String? {
+        switch self {
+        case .unreadable(_, let detail): detail
         }
     }
 }
@@ -53,8 +59,10 @@ enum Probe {
             "-v", "error", "-print_format", "json", "-show_format", "-show_streams", file.path,
         ])
         guard output.status == 0 else {
-            let reason = FFmpegRunner.summarize(stderr: output.stderrString)
-            throw ProbeError.unreadable(reason.isEmpty ? "Not a readable media file" : reason)
+            let raw = FFmpegRunner.summarize(stderr: output.stderrString)
+            let reason = FFmpegRunner.explain(stderr: output.stderrString)
+            throw ProbeError.unreadable(reason.isEmpty ? "Not a readable media file" : reason,
+                                        detail: raw.isEmpty ? nil : raw)
         }
         return try parse(json: output.stdout)
     }

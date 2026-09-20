@@ -60,6 +60,7 @@ final class JobScheduler {
         for job in jobs {
             job.status = .waiting
             job.note = nil
+            job.failureDetail = nil
             job.removedMetadata = []
             queues[lane(job), default: []].append(job)
         }
@@ -103,6 +104,7 @@ final class JobScheduler {
             } catch is CancellationError {
                 job.status = .cancelled
             } catch {
+                job.failureDetail = (error as? DetailedError)?.failureDetail
                 job.status = task.isCancelled ? .cancelled : .failed(error.localizedDescription)
             }
             jobTasks[job.id] = nil

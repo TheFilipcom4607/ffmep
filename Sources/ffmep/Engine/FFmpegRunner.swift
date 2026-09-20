@@ -1,15 +1,27 @@
 import Foundation
 
-enum FFmpegError: LocalizedError {
-    case failed(status: Int32, message: String)
+/// An error that kept what the tool actually printed, for the tooltip and bug reports.
+protocol DetailedError: Error {
+    var failureDetail: String? { get }
+}
+
+enum FFmpegError: LocalizedError, DetailedError {
+    case failed(status: Int32, message: String, detail: String)
     case launch(String)
 
     var errorDescription: String? {
         switch self {
-        case .failed(let status, let message):
+        case .failed(let status, let message, _):
             message.isEmpty ? "ffmpeg exited with status \(status)" : message
         case .launch(let message):
             message
+        }
+    }
+
+    var failureDetail: String? {
+        switch self {
+        case .failed(_, _, let detail): detail.isEmpty ? nil : detail
+        case .launch: nil
         }
     }
 }
@@ -158,8 +170,28 @@ enum FFmpegRunner {
 
         if Task.isCancelled { throw CancellationError() }
         guard status == 0 else {
-            throw FFmpegError.failed(status: status, message: summarize(stderr: String(decoding: errTail.value, as: UTF8.self)))
+            let stderr = String(decoding: errTail.value, as: UTF8.self)
+            throw FFmpegError.failed(status: status, message: explain(stderr: stderr), detail: summarize(stderr: stderr))
         }
+    }
+
+    /// The failures worth phrasing for someone who didn't ask to read ffmpeg's output.
+    private static let explanations: [(needle: String, sentence: String)] = [
+        ("moov atom not found", "This file is damaged or incomplete."),
+        ("Invalid data found when processing input", "This file is damaged or incomplete."),
+        ("End of file", "This file is damaged or incomplete."),
+        ("No such file or directory", "The file was moved or deleted."),
+        ("Permission denied", "ffmep can’t read this file."),
+        ("No space left on device", "The disk is full."),
+    ]
+
+    /// A plain sentence for the reasons we recognise; anything else keeps ffmpeg's own words.
+    /// The raw text stays available as the error's `failureDetail`.
+    static func explain(stderr: String) -> String {
+        if let match = explanations.first(where: { stderr.localizedCaseInsensitiveContains($0.needle) }) {
+            return match.sentence
+        }
+        return summarize(stderr: stderr)
     }
 
     /// Last few meaningful stderr lines, which is where ffmpeg puts the real reason.

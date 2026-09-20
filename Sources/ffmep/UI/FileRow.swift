@@ -98,8 +98,9 @@ private struct DetailText: View {
             Text(text)
                 .help(text)
         case .failed(let reason):
+            // The tooltip keeps ffmpeg's own words, which is what a bug report needs.
             Text(reason)
-                .help(reason)
+                .help(job.failureDetail ?? reason)
         case .running:
             Text(base)
         case .cancelled:
@@ -125,7 +126,8 @@ private struct DetailText: View {
         guard job.fileSize > 0 else { return "" }
         let change = Double(size - job.fileSize) / Double(job.fileSize) * 100
         if change <= -1 { return " · \(Int((-change).rounded()))% smaller" }
-        if change >= 1 { return " · \(Int(change.rounded()))% larger" }
+        // The row already prints both sizes, so how much larger is right there.
+        if change >= 1 { return " · Larger than the original" }
         return ""
     }
 
