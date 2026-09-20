@@ -54,7 +54,9 @@ struct Converter: Sendable {
 
         // Naming always follows the file the user dropped, not the hidden Live Photo video.
         let baseName = OutputNaming.baseName(template: request.nameTemplate, source: request.source, format: settings.format)
-        let final = await reservations.reserve(baseName: baseName, directory: request.outputDirectory, ext: settings.format.fileExtension)
+        let sourceExtension = request.source.pathExtension
+        let final = await reservations.reserve(baseName: baseName, directory: request.outputDirectory,
+                                               ext: settings.format.fileExtension, sourceExtension: sourceExtension)
         let partial = OutputNaming.partialURL(for: final)
         let scratch = fm.temporaryDirectory.appendingPathComponent("ffmep-\(UUID().uuidString)")
         try fm.createDirectory(at: scratch, withIntermediateDirectories: true)
@@ -68,7 +70,8 @@ struct Converter: Sendable {
                 outcome = try await convertMedia(work, partial: partial, scratch: scratch, progress: progress)
             }
             try Task.checkCancellation()
-            var output = try await reservations.commit(partial: partial, to: final, baseName: baseName)
+            var output = try await reservations.commit(partial: partial, to: final, baseName: baseName,
+                                                       sourceExtension: sourceExtension)
             let bytes = (try? fm.attributesOfItem(atPath: output.path)[.size] as? Int64) ?? 0
             let removed = await removedMetadata(from: outcome.sourceMetadata, output: output, format: settings.format)
             var notes = [outcome.note ?? targetSizeNote(settings, bytes: bytes)]

@@ -46,14 +46,25 @@ enum OutputNaming {
         return source.deletingLastPathComponent()
     }
 
-    /// `name.ext`, then `name (1).ext`, `name (2).ext`… until `isTaken` says the slot is free.
-    static func uniqueURL(in directory: URL, baseName: String, ext: String, isTaken: (URL) -> Bool) -> URL {
-        var candidate = directory.appendingPathComponent("\(baseName).\(ext)")
-        var n = 1
-        while isTaken(candidate) {
-            candidate = directory.appendingPathComponent("\(baseName) (\(n)).\(ext)")
-            n += 1
+    /// `name.ext`, then `name (png).ext`, then `name (1).ext`, `name (2).ext`… until `isTaken` says the slot is free.
+    /// The source extension comes first so photo.png and photo.jpg converted together stay tellable apart.
+    static func uniqueURL(in directory: URL, baseName: String, ext: String,
+                          sourceExtension: String? = nil, isTaken: (URL) -> Bool) -> URL {
+        func url(_ name: String) -> URL { directory.appendingPathComponent("\(name).\(ext)") }
+        var candidate = url(baseName)
+        if !isTaken(candidate) { return candidate }
+
+        // "photo (jpg).jpg" would say nothing, so the suffix is skipped when it matches the output.
+        if let source = sourceExtension?.lowercased(), !source.isEmpty, source != ext.lowercased() {
+            candidate = url("\(baseName) (\(source))")
+            if !isTaken(candidate) { return candidate }
         }
+
+        var n = 1
+        repeat {
+            candidate = url("\(baseName) (\(n))")
+            n += 1
+        } while isTaken(candidate)
         return candidate
     }
 
@@ -72,11 +83,13 @@ actor OutputReservations {
     private var reserved: Set<String> = []
 
     func reserve(source: URL, directory: URL, ext: String) -> URL {
-        reserve(baseName: source.deletingPathExtension().lastPathComponent, directory: directory, ext: ext)
+        reserve(baseName: source.deletingPathExtension().lastPathComponent, directory: directory, ext: ext,
+                sourceExtension: source.pathExtension)
     }
 
-    func reserve(baseName: String, directory: URL, ext: String) -> URL {
-        let url = OutputNaming.uniqueURL(in: directory, baseName: baseName, ext: ext) { candidate in
+    func reserve(baseName: String, directory: URL, ext: String, sourceExtension: String? = nil) -> URL {
+        let url = OutputNaming.uniqueURL(in: directory, baseName: baseName, ext: ext,
+                                         sourceExtension: sourceExtension) { candidate in
             // APFS is case-insensitive by default, so compare lowercased paths.
             reserved.contains(candidate.path.lowercased())
                 || FileManager.default.fileExists(atPath: candidate.path)
@@ -108,11 +121,12 @@ actor OutputReservations {
     }
 
     /// Moves a finished partial file into place, picking a new name if the slot got taken meanwhile.
-    func commit(partial: URL, to final: URL, baseName: String) throws -> URL {
+    func commit(partial: URL, to final: URL, baseName: String, sourceExtension: String? = nil) throws -> URL {
         var destination = final
         if FileManager.default.fileExists(atPath: destination.path) {
             reserved.remove(final.path.lowercased())
-            destination = reserve(baseName: baseName, directory: final.deletingLastPathComponent(), ext: final.pathExtension)
+            destination = reserve(baseName: baseName, directory: final.deletingLastPathComponent(),
+                                  ext: final.pathExtension, sourceExtension: sourceExtension)
         }
         try FileManager.default.moveItem(at: partial, to: destination)
         reserved.remove(destination.path.lowercased())

@@ -36,7 +36,7 @@ final class OutputNamingTests: XCTestCase {
     func testNeverOverwritesSource() async throws {
         let source = try touch("photo.jpg")
         let url = await OutputReservations().reserve(source: source, directory: dir, ext: "jpg")
-        XCTAssertEqual(url.lastPathComponent, "photo (1).jpg")
+        XCTAssertEqual(url.lastPathComponent, "photo (1).jpg", "\"photo (jpg).jpg\" would say nothing")
     }
 
     func testCaseInsensitiveCollision() async throws {
@@ -50,12 +50,24 @@ final class OutputNamingTests: XCTestCase {
         let reservations = OutputReservations()
         let a = await reservations.reserve(source: dir.appendingPathComponent("IMG_1.HEIC"), directory: dir, ext: "webp")
         let b = await reservations.reserve(source: dir.appendingPathComponent("IMG_1.JPG"), directory: dir, ext: "webp")
-        XCTAssertEqual(a.lastPathComponent, "IMG_1 (1).webp")
-        XCTAssertEqual(b.lastPathComponent, "IMG_1 (2).webp")
+        XCTAssertEqual(a.lastPathComponent, "IMG_1 (heic).webp")
+        XCTAssertEqual(b.lastPathComponent, "IMG_1 (jpg).webp")
+
+        // Two HEICs from different folders have nothing left to tell them apart but a number.
+        let c = await reservations.reserve(source: dir.appendingPathComponent("sub/IMG_1.HEIC"), directory: dir, ext: "webp")
+        XCTAssertEqual(c.lastPathComponent, "IMG_1 (1).webp")
 
         await reservations.release(a)
-        let c = await reservations.reserve(source: dir.appendingPathComponent("IMG_1.png"), directory: dir, ext: "webp")
-        XCTAssertEqual(c.lastPathComponent, "IMG_1 (1).webp")
+        let d = await reservations.reserve(source: dir.appendingPathComponent("IMG_1.heic"), directory: dir, ext: "webp")
+        XCTAssertEqual(d.lastPathComponent, "IMG_1 (heic).webp")
+    }
+
+    func testSourceExtensionTellsSameNamedFilesApart() async throws {
+        let reservations = OutputReservations()
+        let png = await reservations.reserve(source: dir.appendingPathComponent("photo.png"), directory: dir, ext: "webp")
+        let jpg = await reservations.reserve(source: dir.appendingPathComponent("photo.jpg"), directory: dir, ext: "webp")
+        XCTAssertEqual(png.lastPathComponent, "photo.webp", "the first one still gets the plain name")
+        XCTAssertEqual(jpg.lastPathComponent, "photo (jpg).webp")
     }
 
     func testPartialFileIsHiddenSibling() {
