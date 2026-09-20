@@ -82,19 +82,26 @@ cp vendor/licenses/* "$APP/Contents/Resources/licenses/"
 [[ -f vendor/BUILDINFO.txt ]] && cp vendor/BUILDINFO.txt "$APP/Contents/Resources/BUILDINFO.txt"
 
 # macOS only runs a Shortcuts action for an app signed with a team ID; linkd rejects ad-hoc builds.
-# Uses SIGN_IDENTITY if set, otherwise the first Apple Development certificate, otherwise ad-hoc.
+# Uses SIGN_IDENTITY if set, otherwise a Developer ID Application certificate, otherwise Apple
+# Development, otherwise ad-hoc. Developer ID comes first because it's the only one notarization
+# accepts, and an Apple Development build is fine for everything else.
 if [[ -z "${SIGN_IDENTITY:-}" ]]; then
-  SIGN_IDENTITY="$(security find-identity -v -p codesigning | awk -F'"' '/Apple Development|Developer ID Application/ { print $2; exit }')"
+  IDENTITIES="$(security find-identity -v -p codesigning)"
+  SIGN_IDENTITY="$(awk -F'"' '/Developer ID Application/ { print $2; exit }' <<<"$IDENTITIES")"
+  [[ -n "$SIGN_IDENTITY" ]] || SIGN_IDENTITY="$(awk -F'"' '/Apple Development/ { print $2; exit }' <<<"$IDENTITIES")"
 fi
 SIGN_IDENTITY="${SIGN_IDENTITY:--}"
+# Notarization rejects a signature without a secure timestamp, and an ad-hoc signature can't carry one.
+TIMESTAMP=(--timestamp)
 if [[ "$SIGN_IDENTITY" == "-" ]]; then
+  TIMESTAMP=(--timestamp=none)
   echo "→ ad-hoc signing (hardened runtime)"
   echo "⚠︎ No developer certificate, so Shortcuts will list ffmep's action but can't run it."
 else
-  echo "→ signing as $SIGN_IDENTITY (hardened runtime)"
+  echo "→ signing as $SIGN_IDENTITY (hardened runtime, secure timestamp)"
 fi
-codesign --force --options runtime --timestamp=none -s "$SIGN_IDENTITY" "$APP/Contents/MacOS/ffmpeg" "$APP/Contents/MacOS/ffprobe"
-codesign --force --options runtime --timestamp=none -s "$SIGN_IDENTITY" "$APP"
+codesign --force --options runtime "${TIMESTAMP[@]}" -s "$SIGN_IDENTITY" "$APP/Contents/MacOS/ffmpeg" "$APP/Contents/MacOS/ffprobe"
+codesign --force --options runtime "${TIMESTAMP[@]}" -s "$SIGN_IDENTITY" "$APP"
 codesign --verify --strict --verbose=1 "$APP"
 
 echo "✓ $(du -sh "$APP" | cut -f1)  $APP"
@@ -103,4 +110,9 @@ if [[ -n "$ZIP" ]]; then
   ditto -c -k --keepParent "$APP" "$ZIP"
   echo "✓ $(du -sh "$ZIP" | cut -f1)  $ZIP"
 fi
-echo "Friends: unzip, then right-click ffmep.app → Open the first time."
+# A notarized Developer ID build opens on a double-click; anything else needs the right-click.
+if codesign -dv --verbose=4 "$APP" 2>&1 | grep -q "Authority=Developer ID Application"; then
+  echo "Signed for distribution. Run scripts/release.sh to notarize and build the DMG."
+else
+  echo "Friends: unzip, then right-click ffmep.app → Open the first time."
+fi
