@@ -16,6 +16,6 @@ vendor/ffprobe
 
 # BiRefNet conversion
 .venv/
-BiRefNet/
+/BiRefNet/
 *.mlpackage
 __pycache__/
