@@ -13,6 +13,26 @@ struct SettingsView: View {
         }
         .frame(width: 500)
         .frame(minHeight: 460)
+        .background(ClearsInitialFocus())
+    }
+}
+
+/// Settings otherwise opens with the File Name field focused and {name} selected, one keystroke
+/// away from rewriting the template. `defaultFocus` doesn't unseat AppKit here, so ask the window.
+private struct ClearsInitialFocus: NSViewRepresentable {
+    func makeNSView(context: Context) -> NSView { FocusClearingView() }
+    func updateNSView(_ view: NSView, context: Context) {}
+
+    private final class FocusClearingView: NSView {
+        private var cleared = false
+
+        override func viewDidMoveToWindow() {
+            super.viewDidMoveToWindow()
+            guard !cleared, let window else { return }
+            cleared = true
+            // The text field claims first responder as the window goes on screen, so wait for it.
+            DispatchQueue.main.async { window.makeFirstResponder(nil) }
+        }
     }
 }
 
@@ -35,7 +55,7 @@ private struct GeneralSettings: View {
             } footer: {
                 VStack(alignment: .leading, spacing: 4) {
                     Text(OutputNaming.tokens.map { "\($0.token) \($0.meaning)" }.joined(separator: " · "))
-                    Text("If a file with that name exists, a number is added. Replace Originals keeps the original name.")
+                    Text("If a file with that name exists, the original file type or a number is added. Replace Originals keeps the original name.")
                 }
                 .font(.callout)
                 .foregroundStyle(.secondary)
@@ -160,6 +180,7 @@ private struct GeneralSettings: View {
 
 private struct PresetSettings: View {
     @Environment(AppState.self) private var state
+    @State private var deleting: Preset?
 
     var body: some View {
         Form {
@@ -178,7 +199,7 @@ private struct PresetSettings: View {
                                 .foregroundStyle(.secondary)
                                 .lineLimit(1)
                             Button {
-                                state.deletePreset(id: preset.id)
+                                deleting = preset
                             } label: {
                                 Label("Delete", systemImage: "minus.circle")
                                     .labelStyle(.iconOnly)
@@ -201,6 +222,17 @@ private struct PresetSettings: View {
             }
         }
         .formStyle(.grouped)
+        .confirmationDialog("Delete “\(deleting?.name ?? "")”?", isPresented: deletingBinding) {
+            Button("Delete", role: .destructive) {
+                if let deleting { state.deletePreset(id: deleting.id) }
+            }
+        } message: {
+            Text("Shortcuts that use this preset will stop working.")
+        }
+    }
+
+    private var deletingBinding: Binding<Bool> {
+        Binding(get: { deleting != nil }, set: { if !$0 { deleting = nil } })
     }
 
     /// Looked up by id, so deleting a row never leaves a binding pointing at the wrong preset.

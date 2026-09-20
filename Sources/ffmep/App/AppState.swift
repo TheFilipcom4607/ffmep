@@ -153,15 +153,15 @@ final class AppState {
             let fresh = files.filter { !known.contains($0.standardizedFileURL.path) }
             let classified = await Self.classify(fresh, ffprobe: ffprobe)
 
-            var skipped = 0
+            var skipped: [URL] = []
             var seen = Set(jobs.map { $0.url.standardizedFileURL.path })
             for (url, kind, size) in classified {
-                guard let kind else { skipped += 1; continue }
+                guard let kind else { skipped.append(url); continue }
                 guard seen.insert(url.standardizedFileURL.path).inserted else { continue }
                 jobs.append(Job(url: url, kind: kind, fileSize: size))
             }
             mergeLivePhotoPairs()
-            statusMessage = skipped > 0 ? "Skipped \(skipped) unsupported file\(skipped == 1 ? "" : "s")" : nil
+            statusMessage = Self.skippedMessage(skipped)
             statusIsSuccess = false
             isAdding = false
             if let first = jobs.first, !kindsInQueue.contains(inspectorKind) { inspectorKind = first.kind }
@@ -271,6 +271,17 @@ final class AppState {
             }
         }
         return result
+    }
+
+    /// Names the files ffmep couldn't take, because "Skipped 2 files" leaves you guessing which ones.
+    nonisolated static func skippedMessage(_ urls: [URL]) -> String? {
+        let names = urls.map(\.lastPathComponent)
+        switch names.count {
+        case 0: return nil
+        case 1: return "Skipped \(names[0])"
+        case 2: return "Skipped \(names[0]) and \(names[1])"
+        default: return "Skipped \(names[0]) and \(names.count - 1) more files"
+        }
     }
 
     nonisolated static func classify(_ urls: [URL], ffprobe: URL?) async -> [(URL, MediaKind?, Int64)] {

@@ -34,10 +34,12 @@ struct MoreOptions: View {
                             Image(systemName: "arrow.left.and.right")
                         }
                         .help("Flip Horizontally")
+                        .accessibilityLabel("Flip Horizontally")
                         Toggle(isOn: $settings.flipVertical) {
                             Image(systemName: "arrow.up.and.down")
                         }
                         .help("Flip Vertically")
+                        .accessibilityLabel("Flip Vertically")
                     }
                     .toggleStyle(.button)
                 }

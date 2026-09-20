@@ -88,6 +88,10 @@ struct FfmepApp: App {
                     .keyboardShortcut(.delete, modifiers: [.command, .option])
                     .disabled(state.jobs.isEmpty)
             }
+            CommandGroup(replacing: .help) {
+                Link("ffmep Help", destination: URL(string: "https://github.com/TheFilipcom4607/ffmep#readme")!)
+                Link("Report an Issue…", destination: URL(string: "https://github.com/TheFilipcom4607/ffmep/issues")!)
+            }
             CommandGroup(before: .sidebar) {
                 Button(state.showInspector ? "Hide Inspector" : "Show Inspector") { state.showInspector.toggle() }
                     .keyboardShortcut("i", modifiers: [.command, .option])
