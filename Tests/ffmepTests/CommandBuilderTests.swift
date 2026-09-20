@@ -211,12 +211,46 @@ final class CommandBuilderTests: XCTestCase {
     // MARK: Audio
 
     func testExtractAudioToMP3() throws {
+        // video4K reports no audio bitrate, so nothing caps the quality slider's choice.
         let args = try plan(ConversionSettings(format: .mp3)).passes[0]
         XCTAssertTrue(args.contains("-vn"))
         XCTAssertEqual(value(after: "-map", in: args), "0:a:0")
         XCTAssertEqual(value(after: "-c:a", in: args), "libmp3lame")
         XCTAssertEqual(value(after: "-b:a", in: args), "192k")
         XCTAssertEqual(value(after: "-f", in: args), "mp3")
+    }
+
+    func testLossySourceCapsBitrate() throws {
+        // 64 kbps in, 64 kbps out: re-encoding a lossy file upwards only grows it.
+        var source = ProbeResult(duration: 120, hasAudio: true)
+        source.audioCodec = "mp3"
+        source.audioBitrateKbps = 64
+        let capped = try plan(ConversionSettings(format: .mp3), probe: source)
+        XCTAssertEqual(value(after: "-b:a", in: capped.passes[0]), "64k")
+        XCTAssertEqual(capped.note, "Kept the original 64 kbps")
+
+        // A source above the chosen bitrate is left alone.
+        source.audioBitrateKbps = 320
+        let plenty = try plan(ConversionSettings(format: .mp3), probe: source)
+        XCTAssertEqual(value(after: "-b:a", in: plenty.passes[0]), "192k")
+        XCTAssertNil(plenty.note)
+    }
+
+    func testLosslessSourceIsNotCapped() throws {
+        // FLAC's own bitrate says nothing about how much an MP3 needs.
+        var source = ProbeResult(duration: 120, hasAudio: true)
+        source.audioCodec = "flac"
+        source.audioBitrateKbps = 90
+        XCTAssertEqual(value(after: "-b:a", in: try plan(ConversionSettings(format: .mp3), probe: source).passes[0]), "192k")
+    }
+
+    func testLossySourceCapsVideoAudioTrack() throws {
+        var source = video4K()
+        source.audioCodec = "aac"
+        source.audioBitrateKbps = 96
+        let capped = try plan(ConversionSettings(format: .mp4), probe: source)
+        XCTAssertEqual(value(after: "-b:a", in: capped.passes[0]), "96k")
+        XCTAssertEqual(capped.note, "Kept the original 96 kbps")
     }
 
     func testAudioTargetSizeSnapsBitrate() throws {

@@ -96,6 +96,8 @@ struct EncodePlan: Equatable {
     /// Share of total progress each pass accounts for.
     var passWeights: [Double]
     var usesHardware: Bool
+    /// Something worth telling the user about the choices made here, e.g. a capped audio bitrate.
+    var note: String?
 }
 
 enum CommandBuilder {
@@ -107,6 +109,14 @@ enum CommandBuilder {
         if format == .gif { return try gifPlan(c) }
         if format.isVideoContainer { return try videoPlan(c) }
         return try imagePlan(c)
+    }
+
+    /// Encoding a lossy source above its own bitrate grows the file without adding quality,
+    /// so the source acts as a ceiling, snapped down to a bitrate the encoder family offers.
+    static func cappedAudioBitrate(_ wanted: Int, family: AudioEncoderFamily, probe: ProbeResult) -> (kbps: Int, note: String?) {
+        guard let source = probe.lossyAudioKbps, source < wanted else { return (wanted, nil) }
+        let kbps = family.allowedBitrates.last { $0 <= source } ?? family.allowedBitrates[0]
+        return (kbps, "Kept the original \(kbps) kbps")
     }
 
     static func muxer(for format: OutputFormat) -> String {
@@ -220,15 +230,20 @@ enum CommandBuilder {
         let filterArgs = filters.isEmpty ? [] : ["-vf", filters.joined(separator: ",")]
 
         var audio: [String] = []
+        var note: String?
         if p.hasAudio {
-            let kbps = target?.audioKbps ?? min(AudioEncoderFamily.aac.kbps(quality: s.quality), 256)
+            let wanted = target?.audioKbps ?? min(AudioEncoderFamily.aac.kbps(quality: s.quality), 256)
             if format == .webm {
                 try require("libopus")
-                audio = ["-c:a", "libopus", "-b:a", "\(min(kbps, 192))k"]
+                let rate = cappedAudioBitrate(min(wanted, 192), family: .opus, probe: p)
+                note = rate.note
+                audio = ["-c:a", "libopus", "-b:a", "\(rate.kbps)k"]
             } else if codec == .prores {
                 audio = ["-c:a", (p.audioBitDepth ?? 16) > 16 ? "pcm_s24le" : "pcm_s16le"]
             } else {
-                audio = ["-c:a", c.encoders.contains("aac_at") ? "aac_at" : "aac", "-b:a", "\(kbps)k"]
+                let rate = cappedAudioBitrate(wanted, family: .aac, probe: p)
+                note = rate.note
+                audio = ["-c:a", c.encoders.contains("aac_at") ? "aac_at" : "aac", "-b:a", "\(rate.kbps)k"]
             }
         }
 
@@ -242,7 +257,7 @@ enum CommandBuilder {
 
         guard let twoPass, let log = c.passLogPrefix else {
             final += ["-f", muxer(for: format), c.output.path]
-            return EncodePlan(passes: [final], passWeights: [1], usesHardware: usesHardware)
+            return EncodePlan(passes: [final], passWeights: [1], usesHardware: usesHardware, note: note)
         }
 
         // Pass 1 analyses video only and discards the output; pass 2 writes the file.
@@ -257,7 +272,7 @@ enum CommandBuilder {
         }
         first += ["-an", "-f", "null", "/dev/null"]
         final += ["-f", muxer(for: format), c.output.path]
-        return EncodePlan(passes: [first, final], passWeights: [0.35, 0.65], usesHardware: false)
+        return EncodePlan(passes: [first, final], passWeights: [0.35, 0.65], usesHardware: false, note: note)
     }
 
     private enum TwoPassStyle { case x265, ffmpegPass }
@@ -349,10 +364,13 @@ enum CommandBuilder {
         let duration = c.probe.duration ?? 0
         let targetBytes = s.usesTargetSize && duration > 0 ? TargetSize.bytes(megabytes: s.targetSizeMB) : nil
 
+        var note: String?
         func bitrate(_ family: AudioEncoderFamily) -> String {
-            let kbps = targetBytes.map { TargetSize.audioBitrate(targetBytes: $0, duration: duration, family: family) }
+            let wanted = targetBytes.map { TargetSize.audioBitrate(targetBytes: $0, duration: duration, family: family) }
                 ?? family.kbps(quality: s.quality)
-            return "\(kbps)k"
+            let rate = cappedAudioBitrate(wanted, family: family, probe: c.probe)
+            note = rate.note
+            return "\(rate.kbps)k"
         }
 
         let codec: [String]
@@ -378,7 +396,7 @@ enum CommandBuilder {
         let args = baseArgs + ["-i", c.input.path, "-map", "0:a:0", "-vn", "-sn", "-dn"]
             + codec + containerArgs(settings: s, probe: c.probe)
             + ["-f", muxer(for: s.format), c.output.path]
-        return EncodePlan(passes: [args], passWeights: [1], usesHardware: false)
+        return EncodePlan(passes: [args], passWeights: [1], usesHardware: false, note: note)
     }
 
     // MARK: GIF

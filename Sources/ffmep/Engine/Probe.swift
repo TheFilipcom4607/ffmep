@@ -13,6 +13,8 @@ struct ProbeResult: Sendable, Equatable {
     var videoCodec: String?
     var pixelFormat: String?
     var audioBitDepth: Int?
+    var audioCodec: String?
+    var audioBitrateKbps: Int?
     var isStillImage = false
     /// Container-level tags, keys as ffprobe prints them.
     var formatTags: [String: String] = [:]
@@ -22,6 +24,16 @@ struct ProbeResult: Sendable, Equatable {
     var isHighBitDepth: Bool {
         guard let pixelFormat else { return false }
         return pixelFormat.contains("10") || pixelFormat.contains("12")
+    }
+
+    /// Codecs that keep every sample, where a higher output bitrate can still buy quality.
+    private static let losslessAudioCodecs: Set<String> = ["flac", "alac", "tta", "wavpack"]
+
+    /// The bitrate of a lossy source. Re-encoding above it only grows the file, so it acts as a ceiling.
+    var lossyAudioKbps: Int? {
+        guard let audioBitrateKbps, audioBitrateKbps > 0, let codec = audioCodec?.lowercased() else { return nil }
+        guard !codec.hasPrefix("pcm_"), !Self.losslessAudioCodecs.contains(codec) else { return nil }
+        return audioBitrateKbps
     }
 }
 
@@ -89,10 +101,15 @@ enum Probe {
         }
         if let a = streams.first(where: { $0["codec_type"] as? String == "audio" }) {
             result.hasAudio = true
+            result.audioCodec = a["codec_name"] as? String
             let raw = Int(a["bits_per_raw_sample"] as? String ?? "") ?? 0
             let coded = a["bits_per_sample"] as? Int ?? 0
             let bits = max(raw, coded)
             result.audioBitDepth = bits > 0 ? bits : nil
+            // Some containers (MP3, most notably) only report a bitrate for the file as a whole,
+            // which is the audio bitrate when there's nothing else in there.
+            let kbps = double(a["bit_rate"]) ?? (result.hasVideo ? nil : double(format["bit_rate"]))
+            if let kbps, kbps > 0 { result.audioBitrateKbps = Int((kbps / 1000).rounded()) }
         }
         return result
     }

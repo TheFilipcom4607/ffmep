@@ -35,6 +35,8 @@ struct ConversionResult: Sendable {
 /// What an encode step reports back besides the file itself.
 private struct EncodeOutcome {
     var note: String?
+    /// True when `note` already speaks to the target size, which makes "Over target size" redundant.
+    var coversTargetSize = false
     /// Nil when the original's metadata couldn't be read, so nothing is reported.
     var sourceMetadata: Set<MetadataCategory>?
 }
@@ -74,7 +76,7 @@ struct Converter: Sendable {
                                                        sourceExtension: sourceExtension)
             let bytes = (try? fm.attributesOfItem(atPath: output.path)[.size] as? Int64) ?? 0
             let removed = await removedMetadata(from: outcome.sourceMetadata, output: output, format: settings.format)
-            var notes = [outcome.note ?? targetSizeNote(settings, bytes: bytes)]
+            var notes = [outcome.note, outcome.coversTargetSize ? nil : targetSizeNote(settings, bytes: bytes)]
             if request.replacesOriginal {
                 let replaced = await replaceOriginals(of: request, with: output, bytes: bytes)
                 output = replaced.output
@@ -141,14 +143,15 @@ struct Converter: Sendable {
         let plan = try CommandBuilder.plan(input)
         do {
             try await run(plan, duration: probe.duration, progress: progress)
-            return EncodeOutcome(sourceMetadata: probe.metadata)
+            return EncodeOutcome(note: plan.note, sourceMetadata: probe.metadata)
         } catch let error where plan.usesHardware && !(error is CancellationError) && !Task.isCancelled {
             // VideoToolbox can refuse some inputs (odd sizes, unsupported profiles, busy encoder): retry on the CPU.
             try? FileManager.default.removeItem(at: partial)
             input.forceSoftware = true
             let fallback = try CommandBuilder.plan(input)
             try await run(fallback, duration: probe.duration, progress: progress)
-            return EncodeOutcome(note: "Hardware encoder failed, used software", sourceMetadata: probe.metadata)
+            let notes = ["Hardware encoder failed, used software", fallback.note].compactMap { $0 }
+            return EncodeOutcome(note: notes.joined(separator: " · "), sourceMetadata: probe.metadata)
         }
     }
 
@@ -212,9 +215,10 @@ struct Converter: Sendable {
 
         // The ffmpeg-decoded stand-in has no metadata of its own, so there's nothing to compare against.
         let sourceMetadata = readsOriginal ? MetadataInspector.categories(ofImage: prepared.properties) : nil
-        func merged(_ note: String?) -> EncodeOutcome {
+        func merged(_ note: String?, coversTargetSize: Bool = false) -> EncodeOutcome {
             let parts = [backgroundNote, note].compactMap { $0 }
-            return EncodeOutcome(note: parts.isEmpty ? nil : parts.joined(separator: " · "), sourceMetadata: sourceMetadata)
+            return EncodeOutcome(note: parts.isEmpty ? nil : parts.joined(separator: " · "),
+                                 coversTargetSize: coversTargetSize, sourceMetadata: sourceMetadata)
         }
 
         switch settings.format {
@@ -245,7 +249,7 @@ struct Converter: Sendable {
                 }
             }
             try data.write(to: partial)
-            return merged(note)
+            return merged(note, coversTargetSize: settings.usesTargetSize)
 
         case .webp, .gif:
             let bitmap = scratch.appendingPathComponent("prepared.tiff")
@@ -269,7 +273,7 @@ struct Converter: Sendable {
                 }
                 guard let result, let best = attempts[result.quality] else { throw ImageIOError.encodeFailed("WebP") }
                 try FileManager.default.moveItem(at: best, to: partial)
-                return merged(result.fits ? nil : "Target size not reachable")
+                return merged(result.fits ? nil : "Target size not reachable", coversTargetSize: true)
             }
             try await run(CommandBuilder.plan(input(output: partial, quality: nil)), duration: nil) { _ in }
             return merged(nil)
