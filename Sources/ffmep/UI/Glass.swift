@@ -13,10 +13,14 @@ extension View {
 }
 
 extension Bundle {
+    /// Just the number, e.g. "1.0.0". "dev" when running unbundled, which never compares as a release.
+    static var ffmepShortVersion: String {
+        main.object(forInfoDictionaryKey: "CFBundleShortVersionString") as? String ?? "dev"
+    }
+
     /// Shown in Settings › About, e.g. "Version 1.0.0 (20260916.1612)".
     static var ffmepVersion: String {
-        let version = main.object(forInfoDictionaryKey: "CFBundleShortVersionString") as? String ?? "dev"
         let build = main.object(forInfoDictionaryKey: "CFBundleVersion") as? String ?? ""
-        return build.isEmpty ? "Version \(version)" : "Version \(version) (\(build))"
+        return build.isEmpty ? "Version \(ffmepShortVersion)" : "Version \(ffmepShortVersion) (\(build))"
     }
 }

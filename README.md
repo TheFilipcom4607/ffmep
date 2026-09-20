@@ -159,11 +159,16 @@ faster. Either way it runs on your Mac, and the model can be removed again from 
   the whiskers and the ball stay.</sub>
 </p>
 
-### Nothing leaves your Mac
+### Your files never leave your Mac
 
-Every conversion, and background removal, runs on this Mac. The only thing ffmep
-ever downloads is the optional BiRefNet model, and only after you say yes. There's no
-account, no analytics and no update check. Turn Wi-Fi off and it works the same.
+Every conversion, and background removal, runs on this Mac. No account, no analytics,
+and nothing about your files is ever sent anywhere.
+
+ffmep reaches the network in exactly two places, both optional. It downloads the
+BiRefNet model only after you say yes. And once a day it asks GitHub whether a newer
+version exists — just that question, carrying nothing but the version you're running.
+Settings › General › Check Automatically turns it off, and then ffmep makes no
+network connections at all.
 
 ### The bundled ffmpeg
 

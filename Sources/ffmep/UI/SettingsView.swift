@@ -156,6 +156,13 @@ private struct GeneralSettings: View {
                     Text("Shows a notification when files finish converting while ffmep is in the background.")
                 }
             }
+
+            Section("Updates") {
+                Toggle(isOn: $state.checksForUpdates) {
+                    Text("Check Automatically")
+                    Text("Asks GitHub once a day whether a newer version exists, and nothing else. Turn it off and ffmep makes no network connections at all.")
+                }
+            }
         }
         .formStyle(.grouped)
     }
@@ -269,6 +276,8 @@ private struct PresetSettings: View {
 }
 
 private struct AboutView: View {
+    @Environment(AppState.self) private var state
+
     private var buildInfo: String? {
         let candidates = [
             Bundle.main.url(forResource: "BUILDINFO", withExtension: "txt"),
@@ -296,6 +305,17 @@ private struct AboutView: View {
                 }
                 .frame(maxWidth: .infinity)
                 .padding(.vertical, 8)
+            }
+
+            // Only ever a row here: an update is worth knowing about, not worth interrupting for.
+            if let update = state.updates.available {
+                Section {
+                    LabeledContent {
+                        Link("Download", destination: UpdateCheck.releasePage)
+                    } label: {
+                        Text("Version \(update.version) is available")
+                    }
+                }
             }
 
             Section {

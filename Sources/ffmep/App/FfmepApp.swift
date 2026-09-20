@@ -58,6 +58,10 @@ struct FfmepApp: App {
         .defaultSize(width: 1080, height: 700)
         .windowToolbarStyle(.unified(showsTitle: true))
         .commands {
+            CommandGroup(after: .appInfo) {
+                Button("Check for Updates…") { state.checkForUpdates() }
+                    .disabled(state.updates.isChecking)
+            }
             CommandGroup(replacing: .newItem) {
                 Button("Add Files…") { state.showAddPanel() }
                     .keyboardShortcut("o")

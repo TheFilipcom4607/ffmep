@@ -45,6 +45,16 @@ final class AppState {
     var notificationsEnabled: Bool { didSet { defaults.set(notificationsEnabled, forKey: Keys.notifications) } }
     /// Takes successfully converted files off the list when a batch finishes.
     var removeConvertedFiles: Bool { didSet { defaults.set(removeConvertedFiles, forKey: Keys.removeConverted) } }
+    /// Asks GitHub once a day whether a newer version exists. Off means nothing goes out at all.
+    var checksForUpdates: Bool {
+        didSet {
+            defaults.set(checksForUpdates, forKey: Keys.checksForUpdates)
+            updates.checkIfDue(enabled: checksForUpdates)
+        }
+    }
+
+    // Updates
+    let updates = UpdateCheck()
 
     // Background model
     let subjectModel = SubjectModelStore()
@@ -72,6 +82,7 @@ final class AppState {
         static let limits = "concurrencyLimits"
         static let notifications = "notificationsEnabled"
         static let removeConverted = "removeConvertedFiles"
+        static let checksForUpdates = "checksForUpdates"
         static let nameTemplate = "nameTemplate"
         static let presets = "presets"
         static let offeredExamples = "offeredExamplePresets"
@@ -87,9 +98,11 @@ final class AppState {
         limits = Self.load(ConcurrencyLimits.self, key: Keys.limits, from: d) ?? .default
         notificationsEnabled = d.object(forKey: Keys.notifications) as? Bool ?? true
         removeConvertedFiles = d.object(forKey: Keys.removeConverted) as? Bool ?? true
+        checksForUpdates = d.object(forKey: Keys.checksForUpdates) as? Bool ?? true
         nameTemplate = d.string(forKey: Keys.nameTemplate) ?? OutputNaming.defaultTemplate
         presets = Self.load([Preset].self, key: Keys.presets, from: d) ?? []
         addNewExamplePresets()
+        updates.checkIfDue(enabled: checksForUpdates)
 
         NotificationCenter.default.addObserver(forName: NSApplication.didBecomeActiveNotification, object: nil, queue: .main) { _ in
             NSApp.dockTile.badgeLabel = nil
@@ -566,6 +579,35 @@ final class AppState {
         panel.canChooseFiles = true
         panel.prompt = "Add"
         if panel.runModal() == .OK { add(urls: panel.urls) }
+    }
+
+    // MARK: Updates
+
+    /// ffmep › Check for Updates… — the one place a check says something out loud, because
+    /// someone who picked the menu item is waiting for an answer.
+    func checkForUpdates() {
+        Task {
+            let outcome = await updates.check()
+            let alert = NSAlert()
+            switch outcome {
+            case .available(let release):
+                alert.messageText = "Version \(release.version) is available"
+                alert.informativeText = "You’re running \(Bundle.ffmepShortVersion)."
+                alert.addButton(withTitle: "Download")
+                alert.addButton(withTitle: "Not Now")
+                if alert.runModal() == .alertFirstButtonReturn {
+                    NSWorkspace.shared.open(UpdateCheck.releasePage)
+                }
+            case .upToDate:
+                alert.messageText = "ffmep is up to date"
+                alert.informativeText = "Version \(Bundle.ffmepShortVersion) is the latest version."
+                alert.runModal()
+            case .failed(let reason):
+                alert.messageText = "Couldn’t check for updates"
+                alert.informativeText = reason
+                alert.runModal()
+            }
+        }
     }
 
     // MARK: Notifications
