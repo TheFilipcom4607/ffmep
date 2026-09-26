@@ -22,7 +22,6 @@ fi
 
 NOTARY_PROFILE="${NOTARY_PROFILE:-ffmep-notary}"
 APP="$ROOT/build/ffmep.app"
-STAGE="$ROOT/build/dmg"
 DMG="$ROOT/build/ffmep-$VERSION.dmg"
 
 # Apple Development signs well enough for Shortcuts, but notarization only takes Developer ID.
@@ -64,14 +63,8 @@ echo "→ notarizing the app, which takes a few minutes"
 xcrun notarytool submit "$ROOT/build/ffmep.zip" --keychain-profile "$NOTARY_PROFILE" --wait
 xcrun stapler staple "$APP"
 
-echo "→ staging the disk image"
-rm -rf "$STAGE" "$DMG"
-mkdir -p "$STAGE"
-cp -R "$APP" "$STAGE/ffmep.app"
-ln -s /Applications "$STAGE/Applications"
-
 echo "→ building $(basename "$DMG")"
-hdiutil create -quiet -format UDZO -fs HFS+ -volname "ffmep" -srcfolder "$STAGE" "$DMG"
+scripts/make-dmg.sh "$APP" "$DMG"
 codesign --force --timestamp -s "$SIGN_IDENTITY" "$DMG"
 
 echo "→ notarizing the disk image"
