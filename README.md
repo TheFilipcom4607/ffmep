@@ -46,7 +46,7 @@ opens on a double-click.
 Or with Homebrew:
 
 ```bash
-brew tap TheFilipcom4607/tap && brew install --cask ffmep
+brew install TheFilipcom4607/tap/ffmep
 ```
 
 Either way you need an Apple silicon Mac running macOS 14 or later.
