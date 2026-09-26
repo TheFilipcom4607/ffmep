@@ -50,8 +50,12 @@ fi
 echo "→ building ffmep $VERSION"
 VERSION="$VERSION" SIGN_IDENTITY="$SIGN_IDENTITY" scripts/make-app.sh
 
-codesign -dv --verbose=4 "$APP" 2>&1 | grep -q "Authority=Developer ID Application" \
-  || { echo "$APP didn't come out Developer ID signed; notarization would reject it." >&2; exit 1; }
+# Captured, not piped to grep -q, which would die of SIGPIPE and trip pipefail on a good signature.
+SIGNATURE="$(codesign -dv --verbose=4 "$APP" 2>&1 || true)"
+case "$SIGNATURE" in
+  *"Authority=Developer ID Application"*) ;;
+  *) echo "$APP didn't come out Developer ID signed; notarization would reject it." >&2; exit 1 ;;
+esac
 
 echo "→ staging the disk image"
 rm -rf "$STAGE" "$DMG"

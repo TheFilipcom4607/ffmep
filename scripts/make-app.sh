@@ -111,8 +111,12 @@ if [[ -n "$ZIP" ]]; then
   echo "✓ $(du -sh "$ZIP" | cut -f1)  $ZIP"
 fi
 # A notarized Developer ID build opens on a double-click; anything else needs the right-click.
-if codesign -dv --verbose=4 "$APP" 2>&1 | grep -q "Authority=Developer ID Application"; then
-  echo "Signed for distribution. Run scripts/release.sh to notarize and build the DMG."
-else
-  echo "Friends: unzip, then right-click ffmep.app → Open the first time."
-fi
+# Read the signature into a variable rather than piping to grep -q: grep exits on the first match,
+# codesign dies of SIGPIPE, and pipefail then reports the whole check as failed.
+SIGNATURE="$(codesign -dv --verbose=4 "$APP" 2>&1 || true)"
+case "$SIGNATURE" in
+  *"Authority=Developer ID Application"*)
+    echo "Signed for distribution. Run scripts/release.sh to notarize and build the DMG." ;;
+  *)
+    echo "Friends: unzip, then right-click ffmep.app → Open the first time." ;;
+esac
