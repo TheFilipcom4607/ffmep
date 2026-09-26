@@ -39,6 +39,20 @@ WebP in both directions, Live Photos, and cutting the subject out of a picture.
 
 ## Install
 
+Download the DMG from the [latest release](https://github.com/TheFilipcom4607/ffmep/releases/latest),
+open it, and drag ffmep to your Applications folder. It's signed and notarized, so it
+opens on a double-click.
+
+Or with Homebrew:
+
+```bash
+brew tap TheFilipcom4607/tap && brew install --cask ffmep
+```
+
+Either way you need an Apple silicon Mac running macOS 14 or later.
+
+### Building it yourself
+
 From a clone of this repo:
 
 ```bash
@@ -55,15 +69,10 @@ Xcode command line tools and `brew install cmake meson ninja pkgconf`.
 
 The second builds the app, bundles that ffmpeg, signs it and writes
 `build/ffmep.app` and `build/ffmep.zip`. Use `CONFIG=debug` for a debug build in
-`build/debug/`.
+`build/debug/`. Build with the macOS 26 SDK or newer to get Liquid Glass.
 
-Needs an Apple silicon Mac running macOS 14 or later. Build with the macOS 26 SDK
-or newer to get Liquid Glass.
-
-> [!TIP]
-> Without a developer certificate the build is signed ad-hoc, so Gatekeeper will refuse
-> the first launch. Right-click `ffmep.app` and choose **Open** once, and it will start
-> normally after that.
+A build of your own isn't notarized, so Gatekeeper stops the first launch: right-click
+`ffmep.app`, choose **Open**, and it starts normally from then on.
 
 To use the Shortcuts action, the app has to be signed with an Apple developer
 certificate, because macOS won't run App Intents from an ad-hoc signed app. A free
@@ -199,8 +208,6 @@ ffmep is small on purpose. Reach for something else when:
 
 - **You're on an Intel Mac, or on macOS 13 or older.** ffmep needs Apple silicon and
   macOS 14.
-- **You want a download that just opens.** There's no signed, notarized build yet, so
-  you build it from this repo, and the first launch needs a right-click.
 - **You need to edit, not convert.** There's no trimming, cropping or joining.
 - **Your video has subtitles or several audio tracks.** Subtitle tracks are dropped.
   MOV and MKV keep every audio track, but MP4 and WebM keep only the first.
@@ -240,6 +247,12 @@ version back in with `vtool`.
 It also makes the Shortcuts action visible. Shortcuts reads a `Metadata.appintents`
 bundle that Xcode normally generates, and SwiftPM doesn't, so the script runs Apple's
 `appintentsmetadataprocessor` on the constant values the compiler writes out.
+
+`scripts/release.sh VERSION` cuts a release: it builds through `make-app.sh`, stages the
+app next to an `/Applications` symlink in a DMG, notarizes it with the `ffmep-notary`
+keychain profile, staples the ticket, checks the stapling on both the image and the app
+inside it, and prints the sha256 the Homebrew cask needs. It needs a Developer ID
+Application certificate and `xcrun notarytool store-credentials ffmep-notary`.
 
 The BiRefNet conversion scripts live in [`scripts/birefnet`](scripts/birefnet), with
 usage notes at the top of `convert.py`.
