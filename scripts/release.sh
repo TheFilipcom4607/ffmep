@@ -57,6 +57,13 @@ case "$SIGNATURE" in
   *) echo "$APP didn't come out Developer ID signed; notarization would reject it." >&2; exit 1 ;;
 esac
 
+# The app is notarized and stapled in its own right first. A DMG's ticket stays with the image,
+# so an app dragged out of it would carry none, and a first launch with no network would stall.
+# make-app.sh already wrote the zip, in the ditto format the notary service wants.
+echo "→ notarizing the app, which takes a few minutes"
+xcrun notarytool submit "$ROOT/build/ffmep.zip" --keychain-profile "$NOTARY_PROFILE" --wait
+xcrun stapler staple "$APP"
+
 echo "→ staging the disk image"
 rm -rf "$STAGE" "$DMG"
 mkdir -p "$STAGE"
@@ -67,7 +74,7 @@ echo "→ building $(basename "$DMG")"
 hdiutil create -quiet -format UDZO -fs HFS+ -volname "ffmep" -srcfolder "$STAGE" "$DMG"
 codesign --force --timestamp -s "$SIGN_IDENTITY" "$DMG"
 
-echo "→ notarizing, which takes a few minutes"
+echo "→ notarizing the disk image"
 xcrun notarytool submit "$DMG" --keychain-profile "$NOTARY_PROFILE" --wait
 
 echo "→ stapling"
