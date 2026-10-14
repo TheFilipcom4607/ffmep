@@ -146,6 +146,9 @@ ffmep convert clip.mov --to mp4 --codec h264 --max-size 19MB --resize 1080p
 # A folder of iPhone photos for the web, without location, into a new folder
 ffmep convert ~/Pictures/Trip --to jpeg --resize 2048 --metadata remove-location -o ~/Desktop/Trip
 
+# Keep a JPEG a JPEG, but under 500 KB and without its location
+ffmep convert trip.jpg --to same --max-size 500KB --metadata remove-location
+
 # Shrink photos without changing their format, replacing the originals
 ffmep convert ~/Pictures/Trip --to same --quality small --replace
 

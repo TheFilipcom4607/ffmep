@@ -125,6 +125,21 @@ Relations - G3** from [Apple's certificate page](https://www.apple.com/certifica
 - **Save next to the originals**, into a folder, or replace the originals. Replaced
   files go to the Trash, and only once the new file is safely written.
 
+### Same as Original
+
+Sometimes you don't want a new format, just a smaller file. Pick **Same as Original** at
+the top of the image **Format** menu and every photo stays what it was: JPEGs stay JPEG,
+HEICs stay HEIC, WebPs stay WebP. Everything else still applies, so a JPEG can stay a JPEG
+but come out under 500 KB with its location removed:
+
+```bash
+ffmep convert trip.jpg --to same --max-size 500KB --metadata remove-location
+```
+
+RAW, TIFF and other formats ffmep can't write become JPEG. PNG and GIF have no quality
+to lower, so they barely shrink, and the file says so. The **Compress (Same Format)**
+preset starts you off.
+
 ### Metadata
 
 Photos and videos carry more than pixels: where they were taken, when, the camera
