@@ -87,7 +87,7 @@ final class SubjectModelStore {
     }
 
     /// Downloads the zip into a private temporary file and checks it against the published checksum.
-    private nonisolated static func fetch(progress: @escaping @Sendable (Double) -> Void) async throws -> URL {
+    nonisolated static func fetch(progress: @escaping @Sendable (Double) -> Void) async throws -> URL {
         let watcher = ProgressWatcher(report: progress)
         let (temporary, response) = try await URLSession.shared.download(from: SubjectModel.downloadURL, delegate: watcher)
         watcher.observation = nil
@@ -106,7 +106,7 @@ final class SubjectModelStore {
     }
 
     /// Unzips, compiles for this Mac and moves the result into place.
-    private nonisolated static func install(zip: URL) async throws {
+    nonisolated static func install(zip: URL) async throws {
         let fm = FileManager.default
         let work = fm.temporaryDirectory.appendingPathComponent("ffmep-model-\(UUID().uuidString)", isDirectory: true)
         defer {

@@ -26,8 +26,9 @@ struct FFmpegTools: Sendable, Equatable {
 
 enum FFmpegLocator {
     /// `Contents/MacOS` inside the app, or `vendor/` in the repo when running via `swift run`.
+    /// The command line may run through a symlink, like Homebrew's, so the link is followed into the app.
     static func bundledDirectory() -> URL {
-        if let exeDir = Bundle.main.executableURL?.deletingLastPathComponent(),
+        if let exeDir = Bundle.main.executableURL?.resolvingSymlinksInPath().deletingLastPathComponent(),
            FileManager.default.isExecutableFile(atPath: exeDir.appendingPathComponent("ffmpeg").path) {
             return exeDir
         }

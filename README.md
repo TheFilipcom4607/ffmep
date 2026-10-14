@@ -49,7 +49,12 @@ Or with Homebrew:
 brew install TheFilipcom4607/tap/ffmep
 ```
 
-Either way you need an Apple silicon Mac running macOS 14 or later.
+Either way you need an Apple silicon Mac running macOS 14 or later. Homebrew also puts
+the `ffmep` command on your PATH; from the DMG, link it yourself:
+
+```bash
+sudo ln -sf /Applications/ffmep.app/Contents/MacOS/ffmep /usr/local/bin/ffmep
+```
 
 ### Building it yourself
 
@@ -110,6 +115,9 @@ Relations - G3** from [Apple's certificate page](https://www.apple.com/certifica
   Background, each with its own format, quality, size, metadata and save folder
   settings, plus Convert Files for your presets. They hand the converted files to the
   next step. They need a signed build, see [Install](#install).
+- **A command line** that does everything the app does, for scripts and AI assistants:
+  `ffmep convert clip.mov --to mp4 --max-size 25MB`. Every command takes `--json`, and
+  `--dry-run` shows the ffmpeg commands first. See [docs/cli.md](docs/cli.md).
 - **A queue that keeps moving.** Images, audio, hardware video and software video
   each get their own lane with their own limit, so a slow AV1 encode doesn't hold
   up a folder of photos.

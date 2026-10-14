@@ -73,7 +73,8 @@ final class AppState {
     @ObservationIgnored private let scheduler = JobScheduler()
     @ObservationIgnored private let reservations = OutputReservations()
 
-    private enum Keys {
+    /// Also read by the command line, which shares these preferences.
+    enum Keys {
         static let batch = "batchSettings"
         static let saveLocation = "saveLocation"
         static let outputFolder = "outputFolder"
