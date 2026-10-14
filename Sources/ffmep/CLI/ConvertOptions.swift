@@ -4,6 +4,8 @@ import Foundation
 struct ConvertOptions: Equatable {
     var inputs: [String] = []
     var format: OutputFormat?
+    /// `--to same`: images keep their own format.
+    var keepsFormat = false
     var preset: String?
     var appSettings = false
     var quality: Double?
@@ -58,7 +60,11 @@ struct ConvertOptions: Equatable {
         let args = try ArgumentParser.parse(arguments, options: specs)
         var o = ConvertOptions()
         o.inputs = args.positionals
-        o.format = try args.values["to"].map(CLIValue.format)
+        if let to = args.values["to"], ["same", "original", "keep"].contains(CLIValue.key(to)) {
+            o.keepsFormat = true
+        } else {
+            o.format = try args.values["to"].map(CLIValue.format)
+        }
         o.preset = args.values["preset"]
         o.appSettings = args.has("app-settings")
         o.quality = try args.values["quality"].map(CLIValue.quality)
@@ -123,6 +129,15 @@ struct ConvertOptions: Equatable {
     func settings(for kind: MediaKind, base: ConversionSettings, isLivePhoto: Bool = false) throws -> ConversionSettings {
         var s = base
         if let livePhoto, kind == .image { s.livePhotoMode = livePhoto }
+        if keepsFormat {
+            guard kind == .image else {
+                throw CLIError.failure("--to same is for images. Name a format for \(kind.pluralTitle.lowercased()).")
+            }
+            s.format = .jpeg
+            s.keepsFormat = true
+        } else if format != nil {
+            s.keepsFormat = false
+        }
         if let format {
             if OutputFormat.choices(for: kind).contains(format) {
                 s.format = format

@@ -15,8 +15,11 @@ struct ConversionRequest: Sendable {
     /// Live Photo motion export swaps in the paired video and video settings.
     /// The output keeps the still's name, so IMG_1234.HEIC becomes IMG_1234.mp4.
     var resolved: ConversionRequest {
-        guard let livePhotoVideo, let motion = settings.motionSettings() else { return self }
         var copy = self
+        guard let livePhotoVideo, let motion = settings.motionSettings() else {
+            copy.settings = settings.resolvingFormat(for: source)
+            return copy
+        }
         copy.source = livePhotoVideo
         copy.kind = .video
         copy.settings = motion
@@ -76,7 +79,8 @@ struct Converter: Sendable {
                                                        sourceExtension: sourceExtension)
             let bytes = (try? fm.attributesOfItem(atPath: output.path)[.size] as? Int64) ?? 0
             let removed = await removedMetadata(from: outcome.sourceMetadata, output: output, format: settings.format)
-            var notes = [outcome.note, outcome.coversTargetSize ? nil : targetSizeNote(settings, bytes: bytes)]
+            var notes = [outcome.note, outcome.coversTargetSize ? nil : targetSizeNote(settings, bytes: bytes),
+                         largerThanOriginalNote(work, bytes: bytes)]
             if request.replacesOriginal {
                 let replaced = await replaceOriginals(of: request, with: output, bytes: bytes)
                 output = replaced.output
@@ -118,6 +122,16 @@ struct Converter: Sendable {
         }
         guard let remaining else { return [] }
         return MetadataCategory.allCases.filter { source.contains($0) && !remaining.contains($0) }
+    }
+
+    /// Same as Original is for making files smaller, so say when one didn't get any smaller.
+    private func largerThanOriginalNote(_ work: ConversionRequest, bytes: Int64) -> String? {
+        guard work.settings.keepsFormat,
+              let original = try? FileManager.default.attributesOfItem(atPath: work.source.path)[.size] as? Int64,
+              bytes >= original else { return nil }
+        let format = work.settings.format
+        return format.hasQuality ? "No smaller than the original, which was already well compressed"
+                                 : "\(format.title) has no quality to lower, so it didn’t get smaller"
     }
 
     private func targetSizeNote(_ settings: ConversionSettings, bytes: Int64) -> String? {

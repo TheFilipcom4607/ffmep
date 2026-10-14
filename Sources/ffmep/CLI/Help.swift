@@ -51,6 +51,8 @@ enum Help {
 
     What to make:
       -t, --to FORMAT          webp jpeg png heic gif · mp4 mov mkv webm · mp3 m4a wav flac alac opus
+                               same: each image keeps its own format, just smaller (RAW
+                               and TIFF become JPEG). PNG and GIF barely shrink.
                                A video converted to an audio format keeps just its sound.
       -p, --preset NAME        Start from a preset saved in the app (see `ffmep presets`)
           --app-settings       Start from the settings in the app's inspector
@@ -105,6 +107,7 @@ enum Help {
     Examples:
       ffmep convert *.mov --to mp4 --codec h264 --max-size 19MB --resize 1080p
       ffmep convert IMG_0001.HEIC IMG_0001.MOV --live-photo gif --resize 480p
+      ffmep convert ~/Pictures/Trip --to same --quality small --replace
       ffmep convert recording.mov --to mp3 --quality high
       ffmep convert ~/Desktop/Screens --to webp --quality 80 --strip-metadata --json
       ffmep convert talk.mp4 --preset "Discord (20 MB)" --dry-run

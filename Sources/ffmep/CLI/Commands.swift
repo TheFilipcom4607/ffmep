@@ -137,6 +137,7 @@ enum FormatsCommand {
             )
         }
         return Catalog(formats: formats, values: [
+            "to": OutputFormat.allCases.map(\.rawValue) + ["same"],
             "quality": QualityPreset.allCases.map(\.rawValue) + ["0-100"],
             "resize": ["original", "4k", "1080p", "720p", "480p", "50%", "2048", "1920x1080", "1280x", "x720"],
             "codec": VideoCodec.allCases.map(\.rawValue),

@@ -86,6 +86,9 @@ enum FrameRateOption: String, Codable, CaseIterable, Identifiable, Sendable {
 
 struct ConversionSettings: Codable, Equatable, Sendable {
     var format: OutputFormat
+    /// Images only: write each photo back in its own format, just smaller. `format` is used for
+    /// sources ffmep can't write, like RAW and TIFF. See `resolvingFormat(for:)`.
+    var keepsFormat = false
     var quality: Double = QualityPreset.balanced.value
     var targetSizeEnabled = false
     var targetSizeMB: Double = 10
@@ -137,6 +140,14 @@ struct ConversionSettings: Codable, Equatable, Sendable {
 
     var usesTargetSize: Bool { targetSizeEnabled && supportsTargetSize && targetSizeMB > 0 }
 
+    /// With Same as Original, the format this source is written in; otherwise unchanged.
+    func resolvingFormat(for source: URL) -> ConversionSettings {
+        guard keepsFormat, let own = OutputFormat.sameAs(source) else { return self }
+        var copy = self
+        copy.format = own
+        return copy
+    }
+
     /// Settings for the video part of a Live Photo, or nil when only the still is exported.
     /// Size and orientation carry over from the image settings.
     func motionSettings() -> ConversionSettings? {
@@ -168,7 +179,7 @@ struct ConversionSettings: Codable, Equatable, Sendable {
 
     // Tolerant decoding so settings saved by older versions still load.
     enum CodingKeys: String, CodingKey {
-        case format, quality, targetSizeEnabled, targetSizeMB, resize, customWidth, customHeight,
+        case format, keepsFormat, quality, targetSizeEnabled, targetSizeMB, resize, customWidth, customHeight,
              percent, noUpscale, videoCodec, maxCompression, metadata, rotation,
              flipHorizontal, flipVertical, frameRate, background, subjectDetector, livePhotoMode
     }
@@ -181,6 +192,7 @@ struct ConversionSettings: Codable, Equatable, Sendable {
     init(from decoder: Decoder) throws {
         let c = try decoder.container(keyedBy: CodingKeys.self)
         self.init(format: try c.decode(OutputFormat.self, forKey: .format))
+        keepsFormat = (try? c.decode(Bool.self, forKey: .keepsFormat)) ?? keepsFormat
         quality = (try? c.decode(Double.self, forKey: .quality)) ?? quality
         targetSizeEnabled = (try? c.decode(Bool.self, forKey: .targetSizeEnabled)) ?? targetSizeEnabled
         targetSizeMB = (try? c.decode(Double.self, forKey: .targetSizeMB)) ?? targetSizeMB

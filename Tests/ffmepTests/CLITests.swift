@@ -92,3 +92,43 @@ final class CLITests: XCTestCase {
         XCTAssertThrowsError(try o.baseSettings(for: .image, preferences: prefs))
     }
 }
+
+/// Same as Original: photos keep their format and only get smaller.
+final class SameFormatTests: XCTestCase {
+    func testEachPhotoKeepsItsFormat() {
+        var s = ConversionSettings(format: .jpeg)
+        s.keepsFormat = true
+        func format(_ name: String) -> OutputFormat { s.resolvingFormat(for: URL(fileURLWithPath: "/x/\(name)")).format }
+        XCTAssertEqual(format("a.JPG"), .jpeg)
+        XCTAssertEqual(format("a.heic"), .heic)
+        XCTAssertEqual(format("a.png"), .png)
+        XCTAssertEqual(format("a.webp"), .webp)
+        XCTAssertEqual(format("a.dng"), .jpeg, "RAW can't be written back, so it becomes the fallback")
+
+        s.keepsFormat = false
+        XCTAssertEqual(format("a.heic"), .jpeg)
+    }
+
+    func testRequestsResolveTheFormat() {
+        var s = ConversionSettings(format: .jpeg)
+        s.keepsFormat = true
+        let request = ConversionRequest(source: URL(fileURLWithPath: "/x/a.heic"), kind: .image, settings: s,
+                                        outputDirectory: URL(fileURLWithPath: "/x"))
+        XCTAssertEqual(request.resolved.settings.format, .heic)
+    }
+
+    func testOlderSavedSettingsDecode() throws {
+        let data = Data(#"{"format":"webp","quality":40}"#.utf8)
+        let s = try JSONDecoder().decode(ConversionSettings.self, from: data)
+        XCTAssertFalse(s.keepsFormat)
+    }
+
+    func testCommandLine() throws {
+        let o = try ConvertOptions.parse(["a.heic", "--to", "same", "-q", "small"])
+        XCTAssertTrue(o.keepsFormat)
+        let s = try o.settings(for: .image, base: .defaults(for: .image))
+        XCTAssertTrue(s.keepsFormat)
+        XCTAssertEqual(s.resolvingFormat(for: URL(fileURLWithPath: "/a.heic")).format, .heic)
+        XCTAssertThrowsError(try o.settings(for: .video, base: .defaults(for: .video)))
+    }
+}

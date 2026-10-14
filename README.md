@@ -99,7 +99,8 @@ Relations - G3** from [Apple's certificate page](https://www.apple.com/certifica
   encoder for them, so they finish in a fraction of the time.
 - **Audio** to MP3, AAC, WAV, FLAC, ALAC or Opus, including pulling the soundtrack
   out of a video.
-- **Images** to WebP, JPEG, PNG or HEIC. Anything ImageIO can open goes in,
+- **Images** to WebP, JPEG, PNG or HEIC, or **Same as Original** to just make them
+  smaller: JPEGs stay JPEG, HEICs stay HEIC. Anything ImageIO can open goes in,
   RAW DNGs included. JPEG, PNG and HEIC are written by ImageIO directly, WebP by
   the bundled ffmpeg.
 - **A file size instead of a quality.** Turn on **Limit File Size**, type 10 MB,

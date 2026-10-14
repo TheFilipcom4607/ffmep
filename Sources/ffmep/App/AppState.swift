@@ -214,7 +214,7 @@ final class AppState {
     func targetFormat(for job: Job) -> OutputFormat {
         let settings = effectiveSettings(for: job)
         if job.livePhotoVideo != nil, let motion = settings.motionSettings() { return motion.format }
-        return settings.format
+        return settings.resolvingFormat(for: job.url).format
     }
 
     // MARK: Display & selection

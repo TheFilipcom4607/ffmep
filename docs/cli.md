@@ -54,7 +54,7 @@ inspector is set to. The options below are applied on top.
 
 | Option | Values |
 |---|---|
-| `-t, --to FORMAT` | `webp jpeg png heic gif` · `mp4 mov mkv webm` · `mp3 m4a wav flac alac opus`. A video to an audio format keeps its sound. |
+| `-t, --to FORMAT` | `webp jpeg png heic gif` · `mp4 mov mkv webm` · `mp3 m4a wav flac alac opus`. A video to an audio format keeps its sound. `same` keeps each image's own format and just compresses it (RAW and TIFF become JPEG; PNG and GIF have no quality to lower, so they barely shrink). |
 | `-p, --preset NAME` | A preset from `ffmep presets`, matched ignoring case |
 | `--app-settings` | Start from the app's inspector settings instead |
 | `-q, --quality Q` | `small`, `balanced`, `high` or `0`–`100` |
@@ -145,6 +145,9 @@ ffmep convert clip.mov --to mp4 --codec h264 --max-size 19MB --resize 1080p
 
 # A folder of iPhone photos for the web, without location, into a new folder
 ffmep convert ~/Pictures/Trip --to jpeg --resize 2048 --metadata remove-location -o ~/Desktop/Trip
+
+# Shrink photos without changing their format, replacing the originals
+ffmep convert ~/Pictures/Trip --to same --quality small --replace
 
 # Cut the subject out
 ffmep convert cat.heic --to png --background transparent

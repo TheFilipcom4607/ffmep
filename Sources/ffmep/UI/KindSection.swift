@@ -9,19 +9,27 @@ struct KindSettingsView: View {
     var body: some View {
         Section("Output") {
             PresetPicker(kind: kind, settings: $settings)
-            Picker("Format", selection: $settings.format) {
+            Picker("Format", selection: formatBinding) {
                 let choices = OutputFormat.choices(for: kind)
                 if kind == .video {
                     Section {
-                        ForEach(choices.filter { !$0.isAudio }) { Text($0.title).tag($0) }
+                        ForEach(choices.filter { !$0.isAudio }) { Text($0.title).tag(Optional($0)) }
                     }
                     Section("Audio Only") {
-                        ForEach(choices.filter(\.isAudio)) { Text($0.title).tag($0) }
+                        ForEach(choices.filter(\.isAudio)) { Text($0.title).tag(Optional($0)) }
                     }
                 } else {
-                    ForEach(choices) { Text($0.title).tag($0) }
+                    if kind == .image {
+                        Section {
+                            Text("Same as Original").tag(OutputFormat?.none)
+                        }
+                    }
+                    Section {
+                        ForEach(choices) { Text($0.title).tag(Optional($0)) }
+                    }
                 }
             }
+            .help(settings.keepsFormat ? "Each photo keeps its format, just smaller. RAW, TIFF and other formats ffmep can’t write become JPEG." : "")
             if settings.format.isVideoContainer {
                 Picker("Codec", selection: Binding(get: { settings.effectiveCodec }, set: { settings.videoCodec = $0 })) {
                     ForEach(settings.format.codecChoices) { Text($0.title).tag($0) }
@@ -55,7 +63,10 @@ struct KindSettingsView: View {
                     }
                     .help("BiRefNet has cleaner edges on hair and fur. Apple Vision is faster.")
                 }
-                if settings.background == .transparent, !settings.format.supportsAlpha {
+                if settings.background == .transparent, settings.keepsFormat {
+                    Label("JPEGs can’t store transparency, so they get a white background.", systemImage: "info.circle")
+                        .foregroundStyle(.secondary)
+                } else if settings.background == .transparent, !settings.format.supportsAlpha {
                     Label("\(settings.format.title) can’t store transparency, so the background will be white.",
                           systemImage: "info.circle")
                         .foregroundStyle(.secondary)
@@ -79,5 +90,21 @@ struct KindSettingsView: View {
         }
 
         MoreOptions(kind: kind, settings: $settings)
+    }
+
+    /// Nil is Same as Original. Formats ffmep can't write back, like RAW, then become JPEG.
+    private var formatBinding: Binding<OutputFormat?> {
+        Binding(
+            get: { settings.keepsFormat ? nil : settings.format },
+            set: { format in
+                if let format {
+                    settings.format = format
+                    settings.keepsFormat = false
+                } else {
+                    settings.format = .jpeg
+                    settings.keepsFormat = true
+                }
+            }
+        )
     }
 }

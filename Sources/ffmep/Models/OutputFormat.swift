@@ -83,6 +83,18 @@ enum OutputFormat: String, Codable, CaseIterable, Identifiable, Sendable {
         }
     }
 
+    /// The image format a file is already in, when ffmep can write it back.
+    static func sameAs(_ source: URL) -> OutputFormat? {
+        switch source.pathExtension.lowercased() {
+        case "jpg", "jpeg", "jpe": .jpeg
+        case "png": .png
+        case "heic", "heif": .heic
+        case "webp": .webp
+        case "gif": .gif
+        default: nil
+        }
+    }
+
     static func choices(for kind: MediaKind) -> [OutputFormat] {
         switch kind {
         case .video: [.mp4, .mov, .mkv, .webm, .gif, .mp3, .m4a, .wav, .flac, .alac, .opus]

@@ -87,6 +87,10 @@ struct Preset: Codable, Identifiable, Equatable, Sendable {
                 s.quality = QualityPreset.high.value
                 s.metadata = .removeLocation
             },
+            // Smaller files, same formats: JPEGs stay JPEG, HEICs stay HEIC.
+            preset(.image, "Compress (Same Format)", .jpeg) { s in
+                s.keepsFormat = true
+            },
             preset(.image, "Cutout (PNG)", .png) { s in
                 s.background = .transparent
             },

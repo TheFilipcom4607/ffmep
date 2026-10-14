@@ -277,7 +277,8 @@ enum ConvertCommand {
 
         for job in jobs {
             let settings = settingsByJob[job.id]!
-            let format = job.livePhotoVideo != nil ? (settings.motionSettings()?.format ?? settings.format) : settings.format
+            let format = job.livePhotoVideo != nil ? (settings.motionSettings()?.format ?? settings.format)
+                : settings.resolvingFormat(for: job.url).format
             var report = FileReport(input: job.url.path, status: .failed, kind: job.kind, format: format,
                                     livePhotoVideo: job.livePhotoVideo?.path, inputBytes: job.fileSize, note: job.note)
             switch job.status {
